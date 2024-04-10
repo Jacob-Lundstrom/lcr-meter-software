@@ -3,14 +3,16 @@
 
 import time
 from math import pi, sqrt, atan2
-
+import numpy as np
+import scipy.optimize as curve_fit
+import matplotlib.pyplot as plt
 # Simulation imports
 from sinesimulation import SimulatedSineWave
 
 
 # Define settings as a dictionary
 simulation_settings = {
-    'injection_frequency': 10, # in Hz
+    'injection_frequency': 100, # in Hz
     'injection_voltage_min': -1, # Volts
     'injection_voltage_max': 1, # Volts
 
@@ -51,7 +53,7 @@ load_voltage_phase = 0 + 90 * X_load / abs(X_load) - atan2(X_load, R_shunt)*180/
 load_voltage_phasor = SimulatedSineWave(simulation_settings['injection_frequency'], 
                                   load_voltage_amplitude, load_voltage_offset, load_voltage_phase,
                                   start_time)
-load_voltage_phasor.set_noise(0.1)
+load_voltage_phasor.set_noise(0.01)
 
 shunt_voltage_amplitude = injection_voltage_amplitude * (R_shunt / sqrt(X_load**2 + R_shunt**2))
 shunt_voltage_phase = 0 + 0 - atan2(X_load, R_shunt) * 180/pi
@@ -65,8 +67,61 @@ shunt_voltage_phasor.set_noise(0.1)
 # print(f"shunt_voltage: {shunt_voltage_amplitude}, shunt_phase: {shunt_voltage_phase}")
 
 sampling_rate = 200 * simulation_settings['injection_frequency']
-while (time.time()-start_time) < 0.1:
-    val = load_voltage_phasor.get_current_value()
-    # The minimum sleep time seems to be about 1ms
+sampling_period = 2 * 1 / simulation_settings['injection_frequency']
+
+cols = 3
+total_samples = rows = int(sampling_rate*sampling_period)
+data = np.zeros((rows, cols))
+
+for i in range(0, total_samples):
+    vload = load_voltage_phasor.get_current_value()
+    vshunt = shunt_voltage_phasor.get_current_value()
+    t = time.time()-start_time
+    print(f"{t}, {vload}, {vshunt}")
+    data[i, 0] = t
+    data[i, 1] = vload
+    data[i, 2] = vshunt
+    # The minimum sleep time seems to be about 1ms, which means with a 
     time.sleep(1 / sampling_rate)
-    print(f"{time.time()-start_time}, {val}, {shunt_voltage_phasor.get_current_value()}")
+
+# At this point, the whole sample should be collected. 
+# we now need to compute the least-squares for the 
+# phase angle, then furthermore the amplitude of an
+# ideal sine wave. Doing so should yield a very
+# good approximation of the real sine wave.
+timestamps = data[:, 0]
+start = timestamps[0]  # Start value will be the first value of the column
+stop = timestamps[-1]  # Stop value will be the last value of the column
+num = len(timestamps)  # Number of samples will be the length of the column
+result = np.linspace(start, stop, num)
+# I have no clue why this works but it does
+
+load_sample = data[:, 1]
+start = load_sample[0]  # Start value will be the first value of the column
+stop = load_sample[-1]  # Stop value will be the last value of the column
+num = len(load_sample)  # Number of samples will be the length of the column
+result = np.linspace(start, stop, num)
+
+def model(x, A , phi):
+    return A * np.sin(2*pi*simulation_settings['injection_frequency'] * x + phi)
+
+initial_guess = (1, 0)
+popt, pcov = curve_fit.curve_fit(model, timestamps, load_sample, p0=initial_guess)
+
+A_optimal, phi_optimal = popt
+print(f"Fitted: {A_optimal}, {phi_optimal * 180/pi}")
+print(f"Actual: {load_voltage_amplitude}, {load_voltage_phase}")
+
+data_fit = model(timestamps, A_optimal, phi_optimal)
+
+plt.figure()
+plt.plot(timestamps, load_sample, 'bo', label='Original Data')
+plt.plot(timestamps, data_fit, 'r-', label='Fitted Curve')
+plt.xlabel('Time')
+plt.ylabel('Voltage')
+plt.title('Least Squares Fit of Sine Wave')
+plt.legend()
+plt.show()
+
+# Regardless, at this point we have pretty good guesses for our amplitude and phase.
+# From these guesses, we can calculate the estimated load impedance
