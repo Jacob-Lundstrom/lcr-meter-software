@@ -12,7 +12,7 @@ from sinesimulation import SimulatedSineWave
 
 # Define settings as a dictionary
 simulation_settings = {
-    'injection_frequency': 100, # in Hz
+    'injection_frequency': 1000, # in Hz
     'injection_voltage_min': -1, # Volts
     'injection_voltage_max': 1, # Volts
 
@@ -53,21 +53,22 @@ load_voltage_phase = 0 + 90 * X_load / abs(X_load) - atan2(X_load, R_shunt)*180/
 load_voltage_phasor = SimulatedSineWave(simulation_settings['injection_frequency'], 
                                   load_voltage_amplitude, load_voltage_offset, load_voltage_phase,
                                   start_time)
-load_voltage_phasor.set_noise(0.01)
+load_voltage_phasor.set_noise(0.1)
 
 shunt_voltage_amplitude = injection_voltage_amplitude * (R_shunt / sqrt(X_load**2 + R_shunt**2))
 shunt_voltage_phase = 0 + 0 - atan2(X_load, R_shunt) * 180/pi
 
 # Voltage across 1k Shunt resistor
 shunt_voltage_phasor = SimulatedSineWave(simulation_settings['injection_frequency'], 
-                                  0.1, (injection_dc_offset-load_voltage_offset)/1000, 45,
+                                  shunt_voltage_amplitude, (injection_dc_offset-load_voltage_offset)/1000, shunt_voltage_phase,
                                   start_time)
 shunt_voltage_phasor.set_noise(0.1)
 # print(f"load_voltage: {load_voltage_amplitude}, load_phase: {load_voltage_phase}")
 # print(f"shunt_voltage: {shunt_voltage_amplitude}, shunt_phase: {shunt_voltage_phase}")
 
-sampling_rate = 200 * simulation_settings['injection_frequency']
+sampling_rate = 20 * simulation_settings['injection_frequency']
 sampling_period = 2 * 1 / simulation_settings['injection_frequency']
+# sampling_period = 1
 
 cols = 3
 total_samples = rows = int(sampling_rate*sampling_period)
@@ -102,21 +103,36 @@ stop = load_sample[-1]  # Stop value will be the last value of the column
 num = len(load_sample)  # Number of samples will be the length of the column
 result = np.linspace(start, stop, num)
 
+shunt_sample = data[:, 2]
+start = shunt_sample[0]  # Start value will be the first value of the column
+stop = shunt_sample[-1]  # Stop value will be the last value of the column
+num = len(shunt_sample)  # Number of samples will be the length of the column
+result = np.linspace(start, stop, num)
+
 def model(x, A , phi):
     return A * np.sin(2*pi*simulation_settings['injection_frequency'] * x + phi)
 
 initial_guess = (1, 0)
 popt, pcov = curve_fit.curve_fit(model, timestamps, load_sample, p0=initial_guess)
 
-A_optimal, phi_optimal = popt
-print(f"Fitted: {A_optimal}, {phi_optimal * 180/pi}")
+A_load_optimal, phi_load_optimal = popt
+print(f"Fitted: {A_load_optimal}, {phi_load_optimal * 180/pi}")
 print(f"Actual: {load_voltage_amplitude}, {load_voltage_phase}")
 
-data_fit = model(timestamps, A_optimal, phi_optimal)
+initial_guess = (1, 0)
+popt, pcov = curve_fit.curve_fit(model, timestamps, shunt_sample, p0=initial_guess)
 
+A_shunt_optimal, phi_shunt_optimal = popt
+print(f"Fitted: {A_shunt_optimal}, {phi_shunt_optimal * 180/pi}")
+print(f"Actual: {shunt_voltage_amplitude}, {shunt_voltage_phase}")
+
+load_fit = model(timestamps, A_load_optimal, phi_load_optimal)
+shunt_fit = model(timestamps, A_shunt_optimal, phi_shunt_optimal)
 plt.figure()
 plt.plot(timestamps, load_sample, 'bo', label='Original Data')
-plt.plot(timestamps, data_fit, 'r-', label='Fitted Curve')
+plt.plot(timestamps, load_fit, 'ro-', label='Fitted Curve')
+plt.plot(timestamps, shunt_sample, 'go', label='Original Data')
+plt.plot(timestamps, shunt_fit, 'o-', label='Fitted Curve')
 plt.xlabel('Time')
 plt.ylabel('Voltage')
 plt.title('Least Squares Fit of Sine Wave')
@@ -125,3 +141,5 @@ plt.show()
 
 # Regardless, at this point we have pretty good guesses for our amplitude and phase.
 # From these guesses, we can calculate the estimated load impedance
+
+

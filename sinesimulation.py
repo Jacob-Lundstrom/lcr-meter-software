@@ -24,6 +24,8 @@ class SimulatedSineWave:
         t = time.time() - self.start_time
         if self.noise:
             noise = self.noise_amount * self.amplitude * (random.random()-0.5)
+        else:
+            noise = 0
         self.value = noise + self.dc_offset + self.amplitude * sin(2*pi*self.frequency * t + self.phase_deg * 2*pi / 360)
         return self.value
     
