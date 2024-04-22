@@ -6,6 +6,7 @@
 from math import sin, pi
 import time
 import random
+import numpy as np
 
 class SimulatedSineWave:
     def __init__(self, frequency: float, amplitude: float, dc_offset: float, phase_deg: float, start_time: float):
@@ -23,7 +24,8 @@ class SimulatedSineWave:
     def get_current_value(self):
         t = time.time() - self.start_time
         if self.noise:
-            noise = self.noise_amount * self.amplitude * (random.random()-0.5)
+            # noise = self.noise_amount * self.amplitude * (random.random()-0.5)
+            noise = np.random.normal(0.0, self.amplitude * self.noise_amount)
         else:
             noise = 0
         self.value = noise + self.dc_offset + self.amplitude * sin(2*pi*self.frequency * t + self.phase_deg * 2*pi / 360)
