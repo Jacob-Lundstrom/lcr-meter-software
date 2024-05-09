@@ -1,3 +1,4 @@
+from machine import Pin
 from machine import ADC
 from time import sleep_ms, ticks_ms, ticks_us
 import uarray

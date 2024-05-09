@@ -9,74 +9,107 @@ MISO = 0
 MOSI = 3
 
 nCS_pin  = Pin(nCS, Pin.IN, None) #This can probably be replaced with an IRQ later
-CLK_pin  = Pin(CLK, Pin.IN, Pin.PULL_DOWN) # Indicates no pull resistor
+CLK_pin  = Pin(CLK, Pin.IN, None) # Indicates no pull resistor
 MISO_pin = Pin(MISO, Pin.OUT) # Leave as Hi-Z while not in use
 MOSI_pin = Pin(MOSI, Pin.IN, None) # NC for now, no data in.
 
-def send_byte(data: int):
+transfer_complete = True
+next_position = 7
+next_value = 0
+
+global send_data
+
+def update_MISO(pin):
+    # This should be called every time the CLK signal is changed to high to follow
+    # Motorola SPI mode 0.
+    
+    global send_data
+    global next_value
+    global next_position
+    global transfer_complete
+    global recieve_data
+    
+#     CLK_pin.irq(trigger=Pin.IRQ_RISING, handler=read_MOSI)
+    
+    
+    if next_position > -1:
+        next_value = (send_data >> (next_position)) & 0b1
+        next_position -= 1
+    
+        MISO_pin.value(next_value)
+#         print(next_value)
+    
+    if next_position == -1:
+        finish_transfer()
+
+def read_MOSI(pin=None):
+    global recieve_data
+    global CLK_pin
+    
+    recieve_data |= (MOSI_pin.value() << (next_position + 1))
+    CLK_pin.irq(trigger=Pin.IRQ_FALLING, handler=update_MISO)
+    
+def finish_transfer(pin=None):
+    # This should be called when the nCS pin is pulled high, indicates we should not send data.
+    
+    global transfer_complete
+    global next_position
+    global nCS_pin
+    global CLK_pin
+    
+    transfer_complete = True
+    nCS_pin.irq(handler=None)
+    CLK_pin.irq(handler=None)
+    if next_position == -1:
+        print("Transfer Completed Correctly")
+    else:
+        print("FAILED")
+        print(f"Last position to send: {next_position}")
+    
+def start_transfer(pin=None):
+    global MISO_pin
+    global CLK_pin
+    global nCS_pin
+    
+    MISO_pin = Pin(MISO, Pin.OUT)
+    update_MISO(None)
+#     CLK_pin.irq(trigger=Pin.IRQ_RISING, handler=read_MOSI)
+    CLK_pin.irq(trigger=Pin.IRQ_FALLING, handler=update_MISO)
+    nCS_pin.irq(trigger=Pin.IRQ_RISING, handler=finish_transfer)
+
+def send_byte(data: int) -> None:
+    # Call this funciotn once per byte transfered.
+    
+    global send_data
+    global next_value
+    global next_position
+    global MISO_pin
+    global transfer_complete
+    global recieve_data
+    
+    transfer_complete = False
+    
     # the data variable will only be 8 bits long. Any additional bits will be ignored.
     send_data = data & 0xFF
-    #print(f"send_data: {send_data}")
     recieve_data = 0x00
+    next_position = 7 
     
-    # Wait for nCS to be pulled low
-    nCS_state = nCS_pin.value()
-    #print(f"nCS_state: {nCS_state}")
-    while(nCS_state == 1):
-        nCS_state = nCS_pin.value()
-        #print(f"nCS_state: {nCS_state}")
-        
-    # print("CS de-asserted")
-           
-    # Here, data is being transferred.
-    # With using SPI mode 0:
-    MISO_pin = Pin(MISO, Pin.OUT)
-    recieve_pos = 0
-    while (recieve_pos < 8):
-        nCS_state = nCS_pin.value()
-        send_data = send_data >> recieve_pos
-        # print(f"send_data: {send_data}")
-        send_bit = send_data & 0x01
-        # print(f"send_bit: {send_bit}, send_pos:{recieve_pos}")
-        
-        CLK_state = CLK_pin.value()
-        while (CLK_state):
-#             nCS_state = nCS_pin.value()
-#             if nCS_state:
-#                 recieve_pos = 8
-#                 break
-            CLK_state = CLK_pin.value() # Simple way to wait while the clock polarity is high
-        
-        MISO_pin.value(send_bit)
-        
-        CLK_state = CLK_pin.value()
-        # print(f"CLK_state: {CLK_state}")
-        while (CLK_state == 0):
-#             nCS_state = nCS_pin.value()
-#             if nCS_state:
-#                 recieve_pos = 8
-#                 break
-            CLK_state = CLK_pin.value() # Simple way to wait while the clock polarity is low
-            
-        # At this line, the data should be sampled, as CLK_pin.value() == 1.
-        recieve_data = recieve_data << recieve_pos + MOSI_pin.value()
-        recieve_pos = recieve_pos + 1
-        #print(f"recieve_data: {recieve_data}")
-        #print(f"recieve_pos: {recieve_pos}")
-            
-        # When this line is reached, the cycle should repeat.
+    nCS_pin.irq(trigger=Pin.IRQ_FALLING, handler=start_transfer)
     
+    while(transfer_complete == False):
+        time.sleep_us(1)
+
     # When this line is reached, we should quit driving the pin
     # Do this through changing the pin mode to input.
+    
     MISO_pin = Pin(MISO, Pin.IN, None)
     
-    while(nCS_pin.value() == 0):
-        time.sleep(0)
+    return recieve_data
         
 if __name__ == "__main__":
+    byte = 0b10101010
+    byte = 0b1
     while(True):
-        print("sending data...")
-        send_byte(0x3F)
-        print("data sent.")
-        
-            
+        byte = byte + 1
+        rec = send_byte(byte)
+        print(byte)
