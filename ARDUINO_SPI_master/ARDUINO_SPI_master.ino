@@ -16,7 +16,6 @@ void setup() {
   delay(100);
 
   SPI.begin();
-  //SPI.setClockDivider(SPI_CLOCK_DIV2); // divide the clock by 8
   SPI.setClockDivider(SPI_CLOCK_DIV128);
   digitalWrite(SS, LOW); // enable Slave Select
   // send test char
