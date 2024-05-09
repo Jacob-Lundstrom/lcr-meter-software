@@ -7,7 +7,7 @@ def test_transfer() -> None:
 
     spi = spidev.SpiDev()
     spi.open(bus,device)
-    spi.max_speed_hz = 7+000 # 7 kHz clk speed
+    spi.max_speed_hz = 7000 # 7 kHz clk speed
     spi.mode = 0
 
     # data_out = [0xFF,0x02,0xFF,0x04,0xFF]
