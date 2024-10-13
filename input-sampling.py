@@ -12,18 +12,18 @@ from sinesimulation import SimulatedSineWave
 def simulate_sample(show_detail: bool=False) -> list:
     # Define settings as a dictionary
     simulation_settings = {
-        'injection_frequency': 15.91, # in Hz
-        'injection_voltage_min': 0, # Volts
-        'injection_voltage_max': 4, # Volts
+        'injection_frequency': 10, # in Hz
+        'injection_voltage_min': -2, # Volts
+        'injection_voltage_max': 2, # Volts
 
-        'shunt_resistance': 1000*100, # Ohms
+        'shunt_resistance': 147850, # Ohms
         'load_value_nano': 100, # nF or nH
         'load_is_capacitor': True,
         'load_is_inductor': False,
 
         'sampling_multiplier': 200, # How many samples per period will be recorded
-        'simulated_load_noise_percentage': 0.1,
-        'simulated_shunt_noise_percentage': 0.1,
+        'simulated_load_noise_percentage': 0.0,
+        'simulated_shunt_noise_percentage': 0.0,
     }
 
     # Create time-varying sine waves for simulation
@@ -114,22 +114,11 @@ def simulate_sample(show_detail: bool=False) -> list:
     num = len(shunt_sample)  # Number of samples will be the length of the column
     result = np.linspace(start, stop, num)
 
-    
-    def model_shunt(x, A , phi):
-        vals = np.sin(2*pi*simulation_settings['injection_frequency'] * x + phi)
-        out = 0*vals
-        counter = 0
-        for i in vals:
-            if i > 0:
-                out[counter] = A * i
-            counter += 1
-        return out
-
-    def model_load(x, A , phi):
-        return A * np.sin(2*pi*simulation_settings['injection_frequency'] * x + phi) + (simulation_settings['injection_voltage_max'] + simulation_settings['injection_voltage_min'])/2
+    def model(x, A , phi):
+        return A * np.sin(2*pi*simulation_settings['injection_frequency'] * x + phi)
 
     initial_guess = (1, 0)
-    popt, pcov = curve_fit.curve_fit(model_load, timestamps, load_sample, p0=initial_guess)
+    popt, pcov = curve_fit.curve_fit(model, timestamps, load_sample, p0=initial_guess)
 
     A_load_optimal, phi_load_optimal = popt
     if show_detail:
@@ -138,7 +127,7 @@ def simulate_sample(show_detail: bool=False) -> list:
         print(f"Actual: {load_voltage_amplitude}, {load_voltage_phase}")
 
     initial_guess = (1, 0)
-    popt, pcov = curve_fit.curve_fit(model_shunt, timestamps, shunt_sample, p0=initial_guess)
+    popt, pcov = curve_fit.curve_fit(model, timestamps, shunt_sample, p0=initial_guess)
 
     A_shunt_optimal, phi_shunt_optimal = popt
     if show_detail:
@@ -146,16 +135,17 @@ def simulate_sample(show_detail: bool=False) -> list:
         print(f"Fitted: {A_shunt_optimal}, {phi_shunt_optimal * 180/pi}")
         print(f"Actual: {shunt_voltage_amplitude}, {shunt_voltage_phase}")
 
-        load_fit = model_load(timestamps, A_load_optimal, phi_load_optimal)
-        shunt_fit = model_shunt(timestamps, A_shunt_optimal, phi_shunt_optimal) 
+        load_fit = model(timestamps, A_load_optimal, phi_load_optimal)
+        shunt_fit = model(timestamps, A_shunt_optimal, phi_shunt_optimal)
         plt.figure()
         plt.plot(timestamps, load_sample, 'o', label='Original Data (Load)')
         plt.plot(timestamps, load_fit, '-', label='Fitted Curve (Load)')
         plt.plot(timestamps, shunt_sample, 'o', label='Original Data (Shunt)')
         plt.plot(timestamps, shunt_fit, '-', label='Fitted Curve (Shunt)')
         plt.xlabel('Time')
+        plt.xlim([0,0.2])
         plt.ylabel('Voltage')
-        plt.title('Best Fit of Sine Wave')
+        plt.title('Least Squares Fit of Sine Wave')
         plt.legend()
         plt.show()
 
@@ -176,7 +166,7 @@ def simulate_sample(show_detail: bool=False) -> list:
     real_load = Z_load_mag * np.cos(Z_load_ang)
     imag_load = Z_load_mag * np.sin(Z_load_ang)
     if show_detail:
-        print(f"Calculated net impedance: {real_load}, j({imag_load})")
+        print(f"{real_load}, j({imag_load})")
         print(f"Actual load Reactance: {X_load}")
 
     if imag_load < 0:
@@ -200,4 +190,4 @@ if __name__ == "__main__":
 
     print(f'Estimated after multiple samples: {total} nF')
     ideal_capacitance = 100
-    print(f"Error: {100 * ((total-ideal_capacitance)/ideal_capacitance )}%")
+    print(f"Error: {100 * (total-ideal_capacitance)/ideal_capacitance}%")

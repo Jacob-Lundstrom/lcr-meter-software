@@ -5,8 +5,8 @@
 
 from math import sin, pi
 import time
+import random
 import numpy as np
-
 
 class SimulatedSineWave:
     def __init__(self, frequency: float, amplitude: float, dc_offset: float, phase_deg: float, start_time: float):
