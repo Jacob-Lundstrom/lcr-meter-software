@@ -3,68 +3,72 @@
 # AD9833
 
 # IMPORTS
-from machine import Pin, SPI, Timer, PWM
-import time
-import math
+import spidev
+import RPi.GPIO as GPIO
 
-# SPI COMMUNICATION INTERFACE PINS
-nCS = 17
-MISO = 16 # can be left NC, not used for the DAC
-MOSI = 19
-SCK = 18
+import time
+
+
 freq = 1_000_000 #Max SPI Frequency for the AD9833 is 40 MHz
 
 master_clk = 2_000_000 # Has a direct relation to the output waveform frequency
 
-nCS_pin = Pin(nCS, Pin.OUT)
-nCS_pin.value(1)
+GPIO.setmode(GPIO.BCM)		#set pin numbering system
+GPIO.setup(12,GPIO.OUT)
+pi_pwm = GPIO.PWM(12,master_clk)		#create PWM instance with frequency
+pi_pwm.start(0.5)	
 
-spi = SPI(0,
-          baudrate=freq,
-          sck=Pin(SCK),
-          mosi=Pin(MOSI),
-          miso=Pin(MISO))
+# Setup SPI
+spi = spidev.SpiDev()
+spi.open(0, 1)  # Bus 0, Device 1
+spi.max_speed_hz = freq
 
-def AD9833_write(spi, cs, data_high, data_low):
+def AD9833_write(spi, data_high, data_low):
     """
     Write 2 bytes to the specified register.
     """
-    msg1 = bytearray()
-    msg1.append(data_high)
     
-    msg2 = bytearray()
-    msg2.append(data_low)
-    
-    msg = msg1 + msg2
-    # Send out SPI message
-    cs.value(0)
-    spi.write(msg)
-    cs.value(1)
+    bus = 0
+    device = 1
 
-CLK = PWM(Pin(20))
-CLK.freq(master_clk)
-CLK.duty_u16(2**15)
+    spi = spidev.SpiDev()
+    spi.open(bus,device)
+    spi.max_speed_hz = 900_000 
+    spi.mode = 0
 
-# From datasheet, page 15, Table 11
-AD9833_write(spi, nCS_pin, 0b0001_0000, 0b0000_0000)
-AD9833_write(spi, nCS_pin, 0b0100_0000, 0b1111_1111)
+    data_out = bytearray([data_high, data_low])
+    spi.xfer(data_out)
+
+    spi.close()
+
+
 
 def AD9833_set_freq(frequency):
     # should be used with the Master input clock frequency of 10 MHz
     global master_clk
     global spi
     
-    FRQREG = int((frequency) * (2**28) / (master_clk)) # Page 15
-    FRQREG = FRQREG // 4 # For some reason I have to do this adjustment
+    FRQREG = int((frequency) * (2**28) / (master_clk))  # Page 15
+    FRQREG = FRQREG // 4  # For some reason I have to do this adjustment
     
-    lb = FRQREG & 0b1111_1111
-    hb = ((FRQREG & 0b1111_0000_0000) >> 8) + 0b0100_0000
-    AD9833_write(spi, nCS_pin, 0b0001_0000, 0b0000_0000)
-    AD9833_write(spi, nCS_pin, hb, lb)
+    lb = FRQREG & 0b11111111
+    hb = ((FRQREG & 0b111100000000) >> 8) + 0b01000000
+    AD9833_write(spi, 0b0001_0000, 0b0000_0000)
+    AD9833_write(spi, hb, lb)
 
-AD9833_set_freq(100_000)
+def AD9833_Init():
+    # Initialize AD9833
+    AD9833_write(spi, 0b0001_0000, 0b0000_0000)
+    AD9833_write(spi, 0b0100_0000, 0b1111_1111)
 
-while(1):
-    pass
-    
-    
+def main():
+    AD9833_Init()
+    # Set frequency to 100 kHz
+    AD9833_set_freq(100_000)
+
+    print("Done initializing AD9833")
+    while(1):
+        pass
+
+if __name__ == "__main__":
+    main()
