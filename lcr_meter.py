@@ -32,13 +32,14 @@ def append_to_csv(filename, t, value1, value2):
 
 def main():
     start_time = datetime.now()
-    injection_freq = 1000
+    injection_freq = 10000
     omega = 2 * pi * injection_freq
     shunt_resistance = 99.6
-    samples = 100000
+    samples = 1000
 
-    AD9833.AD9833_Init()
+    #AD9833.AD9833_Init()
     AD9833.AD9833_set_freq(injection_freq)
+
 
     data = np.zeros((samples, 3))
 
@@ -112,14 +113,14 @@ def main():
 
     print(f'Estimated capacitance: {load_val_nano_guess}')
 
-
+'''
     # Create a new CSV file
     csv_filename = create_csv_file()
 
     for i in range(len(data)):
         append_to_csv(csv_filename, data[i][0], data[i][1], data[i][2])
     print(f"Data has been written to {csv_filename}")
-
+'''
 
 if __name__ == "__main__":
     main()
