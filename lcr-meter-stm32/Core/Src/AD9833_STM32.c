@@ -13,7 +13,6 @@ void AD9833_write(uint8_t data_high, uint8_t data_low) {
     uint8_t data_out[2] = {data_high, data_low};
     
 
-    // This doesn't cause it to change for some reason.
     hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;  // CPOL = 1 (Clock idle high)
     hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;       // CPHA = 0 (Sample on the falling edge)
     HAL_SPI_Init(&hspi1); // Restart the SPI module

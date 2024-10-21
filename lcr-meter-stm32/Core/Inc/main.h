@@ -72,6 +72,8 @@ void Error_Handler(void);
 #define STLK_TX_GPIO_Port GPIOD
 #define AD9833_NCS_Pin GPIO_PIN_14
 #define AD9833_NCS_GPIO_Port GPIOD
+#define MCP3202_NCS_Pin GPIO_PIN_15
+#define MCP3202_NCS_GPIO_Port GPIOD
 #define USB_PowerSwitchOn_Pin GPIO_PIN_6
 #define USB_PowerSwitchOn_GPIO_Port GPIOG
 #define USB_OverCurrent_Pin GPIO_PIN_7
