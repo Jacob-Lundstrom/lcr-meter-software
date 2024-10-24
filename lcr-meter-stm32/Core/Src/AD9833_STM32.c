@@ -34,7 +34,7 @@ void AD9833_write4(uint8_t data_l_high, uint8_t data_l_low, uint8_t data_h_high,
     HAL_GPIO_WritePin(AD9833_NCS_GPIO_Port, AD9833_NCS_Pin, GPIO_PIN_SET);
 }
 
-void AD9833_set_freq(uint64_t f) {
+void AD9833_set_freq(float f) {
     AD9833_write(0b00100000, 0b10000000); // Control reg, start reset
 
     uint64_t FRQREG = (uint64_t)((f * (1 << 28)) / MASTER_CLK);

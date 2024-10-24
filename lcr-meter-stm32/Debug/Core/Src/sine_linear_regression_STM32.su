@@ -1,0 +1,9 @@
+../Core/Src/sine_linear_regression_STM32.c:6:7:sumSquared	24	static
+../Core/Src/sine_linear_regression_STM32.c:14:7:sumSineSquared	56	static
+../Core/Src/sine_linear_regression_STM32.c:22:7:sumCosineSquared	56	static
+../Core/Src/sine_linear_regression_STM32.c:30:7:sumMult	32	static
+../Core/Src/sine_linear_regression_STM32.c:38:7:sumSineMult	56	static
+../Core/Src/sine_linear_regression_STM32.c:46:7:sumCosineMult	56	static
+../Core/Src/sine_linear_regression_STM32.c:54:7:avg	24	static
+../Core/Src/sine_linear_regression_STM32.c:62:8:avg2	40	static
+../Core/Src/sine_linear_regression_STM32.c:70:6:SINE_least_squares_regression	64	static

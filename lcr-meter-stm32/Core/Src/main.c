@@ -24,6 +24,8 @@
 #include "AD9833_STM32.h"
 #include "MCP3202_STM32.h"
 #include "sine_fit_STM32.h"
+#include "sine_linear_regression_STM32.h"
+
 #include <math.h>
 /* USER CODE END Includes */
 
@@ -110,7 +112,7 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-  float frequency = 10000;
+  float frequency = 3000;
 
   AD9833_set_freq(frequency);
 
@@ -160,31 +162,40 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//	  HAL_Delay(sample_delay);
-	  ch0_data[i] = ADC_Channel0();
-	  ch0_time[i] = ((double)(Get_Time_us() - start_time)) / 1e6;
-//	  HAL_Delay(sample_delay);
-	  ch1_data[i] = ADC_Channel1();
-	  ch1_time[i] = ((double)(Get_Time_us() - start_time)) / 1e6;
+	  float avg = 0;
+	  int cycles = 100;
+	  for (int i = 0; i < cycles; i++) {
+		  int samples = 0;
+		  uint32_t s = Get_Time_us();
+		  while((float)(Get_Time_us() - s) < 1e6 / frequency) {
+			  //	  HAL_Delay(sample_delay);
+			  ch0_data[samples] = ADC_Channel0();
+			  ch0_time[samples] = ((double)(Get_Time_us() - start_time)) / 1e6;
+		//	  HAL_Delay(sample_delay);
+			  ch1_data[samples] = ADC_Channel1();
+			  ch1_time[samples] = ((double)(Get_Time_us() - start_time)) / 1e6;
 
-	  if (i >= n_points - 1 ) {
-		  i = 0;
+			  samples++;
+		  }
 
-		  fitSineWave(ch0_data, ch0_time, n_points, frequency, &load_amplitude, &load_phase, &load_offset);
-		  fitSineWave(ch1_data, ch1_time, n_points, frequency, &shunt_amplitude, &shunt_phase, &shunt_offset);
+		  SINE_least_squares_regression(ch0_data, ch0_time, samples, frequency, &load_amplitude, &load_phase, &load_offset);
+		  SINE_least_squares_regression(ch1_data, ch1_time, samples, frequency, &shunt_amplitude, &shunt_phase, &shunt_offset);
 
-		  float impedance_magnitude = (load_amplitude / (shunt_amplitude / 100));
+		  float shunt_resistance = 99.67;
+		  float impedance_magnitude = (load_amplitude / (shunt_amplitude / shunt_resistance));
 		  float impedance_angle = (load_phase - shunt_phase);
-		  float resistance = impedance_magnitude * cos(impedance_angle) - 100;
+		  float resistance = impedance_magnitude * cos(impedance_angle) - shunt_resistance;
 		  float reactance = impedance_magnitude * sin(impedance_angle);
 		  float inductance = reactance / (2 * M_PI * frequency);
 		  float capacitance = - 1 / (2 * M_PI * frequency * reactance);
+		  samples = 0;
 		  __HAL_TIM_SET_COUNTER(&htim2, 0);
 		  start_time = Get_Time_us();
-
-	  } else {
-		  i++;
+		  avg += capacitance;
 	  }
+	  avg = avg / cycles;
+	  avg = avg;
+
 
     /* USER CODE END WHILE */
 
@@ -314,7 +325,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -348,7 +359,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 167;
+  htim2.Init.Prescaler = 83;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 4294967295;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;

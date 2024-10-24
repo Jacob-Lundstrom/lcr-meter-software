@@ -2,6 +2,7 @@
 "./Core/Src/MCP3202_STM32.o"
 "./Core/Src/main.o"
 "./Core/Src/sine_fit_STM32.o"
+"./Core/Src/sine_linear_regression_STM32.o"
 "./Core/Src/stm32f4xx_hal_msp.o"
 "./Core/Src/stm32f4xx_it.o"
 "./Core/Src/syscalls.o"

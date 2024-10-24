@@ -10,7 +10,7 @@
 // Function prototypes for interacting with the AD9833
 void AD9833_write(uint8_t data_high, uint8_t data_low);
 void AD9833_write4(uint8_t data_l_high, uint8_t data_l_low, uint8_t data_h_high, uint8_t data_h_low);
-void AD9833_set_freq(uint64_t f);
+void AD9833_set_freq(float f);
 void AD9833_Init(void);
 
 #endif /* AD9833_H */
