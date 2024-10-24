@@ -23,6 +23,8 @@
 /* USER CODE BEGIN Includes */
 #include "AD9833_STM32.h"
 #include "MCP3202_STM32.h"
+#include "sine_fit_STM32.h"
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -108,22 +110,25 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-  AD9833_set_freq(1000);
+  float frequency = 10000;
 
-  int n_points = 5000;
+  AD9833_set_freq(frequency);
+
+  int n_points = 1000;
   int sample_delay = 1;
 
   uint32_t start_time;
 
   int i = 0; // Array index counter
 
+  // All the data must be floating point, as the nucleo board I'm using doesn't have enough memory for double.
   float ch0_data[n_points];
-  int ch0_time[n_points];
+  float ch0_time[n_points];
   memset(ch0_data, 0, n_points);  // Set all bytes in the array to 0
-  memset(ch0_time, 0, n_points);  // Set all bytes in the array to 0\
+  memset(ch0_time, 0, n_points);  // Set all bytes in the array to 0
 
   float ch1_data[n_points];
-  int ch1_time[n_points];
+  float ch1_time[n_points];
   memset(ch1_time, 0, n_points);  // Set all bytes in the array to 0
   memset(ch1_data, 0, n_points);  // Set all bytes in the array to 0
 
@@ -137,30 +142,50 @@ int main(void)
 
   start_time = Get_Time_us();
 
+  void wait_us(uint32_t w) {
+	  uint32_t s = Get_Time_us();
+  }
+
+  float load_amplitude = 0;
+  float load_phase = 0;
+  float load_offset = 0;
+
+  float shunt_amplitude = 0;
+  float shunt_phase = 0;
+  float shunt_offset = 0;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
-//	  HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_SET);
-//	  HAL_Delay(1000);
-//	  HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
-//	  HAL_Delay(1000);
-
 //	  HAL_Delay(sample_delay);
 	  ch0_data[i] = ADC_Channel0();
-	  ch0_time[i] = Get_Time_us() - start_time;
+	  ch0_time[i] = ((double)(Get_Time_us() - start_time)) / 1e6;
 //	  HAL_Delay(sample_delay);
 	  ch1_data[i] = ADC_Channel1();
-	  ch1_time[i] = Get_Time_us() - start_time;
-	  i++;
+	  ch1_time[i] = ((double)(Get_Time_us() - start_time)) / 1e6;
+
 	  if (i >= n_points - 1 ) {
 		  i = 0;
+
+		  fitSineWave(ch0_data, ch0_time, n_points, frequency, &load_amplitude, &load_phase, &load_offset);
+		  fitSineWave(ch1_data, ch1_time, n_points, frequency, &shunt_amplitude, &shunt_phase, &shunt_offset);
+
+		  float impedance_magnitude = (load_amplitude / (shunt_amplitude / 100));
+		  float impedance_angle = (load_phase - shunt_phase);
+		  float resistance = impedance_magnitude * cos(impedance_angle) - 100;
+		  float reactance = impedance_magnitude * sin(impedance_angle);
+		  float inductance = reactance / (2 * M_PI * frequency);
+		  float capacitance = - 1 / (2 * M_PI * frequency * reactance);
 		  __HAL_TIM_SET_COUNTER(&htim2, 0);
 		  start_time = Get_Time_us();
+
+	  } else {
+		  i++;
 	  }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

@@ -23,7 +23,7 @@ float ADC_Channel0(void) {
     uint16_t adc_value = ((data_in[0] & 0x0F) << 8) | data_in[1];
 
     // Calculate the voltage based on the 3.3V reference and 12-bit ADC resolution
-    float voltage = 3.3f * adc_value / (float)(1 << 12); // 12-bit resolution (2^12)
+    float voltage = 3.3f * adc_value / (float)(1 << 11); // 12-bit resolution (2^12)
 
     return voltage;
 }
@@ -47,7 +47,7 @@ float ADC_Channel1(void) {
     uint16_t adc_value = ((data_in[0] & 0x0F) << 8) | data_in[1];
 
     // Calculate the voltage based on the 3.3V reference and 12-bit ADC resolution
-    float voltage = 3.3f * adc_value / (float)(1 << 12); // 12-bit resolution (2^12)
+    float voltage = 3.3f * adc_value / (float)(1 << 11); // 12-bit resolution (2^12)
 
     return voltage;
 }

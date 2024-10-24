@@ -1,0 +1,6 @@
+../Core/Src/sine_fit_STM32.c:6:7:calculateError	2
+../Core/Src/sine_fit_STM32.c:18:7:max	3
+../Core/Src/sine_fit_STM32.c:29:7:min	3
+../Core/Src/sine_fit_STM32.c:39:7:find_zero_crossing	7
+../Core/Src/sine_fit_STM32.c:62:7:find_offset	2
+../Core/Src/sine_fit_STM32.c:72:6:fitSineWave	3
