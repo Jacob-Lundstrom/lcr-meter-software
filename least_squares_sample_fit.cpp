@@ -14,10 +14,42 @@ float sumSquared(const float arr[], int size) {
     return sum;
 }
 
+float sumSineSquared( const float timestamps[], int size, float frequency) {
+    float sum = 0;
+    for (int i = 0; i < size; i++) {
+        sum += sin(2 * M_PI * frequency * timestamps[i]) * sin(2 * M_PI * frequency * timestamps[i]);
+    }
+    return sum;
+}
+
+float sumCosineSquared( const float timestamps[], int size, float frequency) {
+    float sum = 0;
+    for (int i = 0; i < size; i++) {
+        sum += cos(2 * M_PI * frequency * timestamps[i]) * cos(2 * M_PI * frequency * timestamps[i]);
+    }
+    return sum;
+}
+
 float sumMult(const float arr1[], const float arr2[], int size) {
     float sum = 0;
     for (int i = 0; i < size; i++) {
         sum += arr1[i] * arr2[i];
+    }
+    return sum;
+}
+
+float sumSineMult(const float data[], const float timestamps[], int size, float frequency) {
+    float sum = 0;
+    for (int i = 0; i < size; i++) {
+        sum += data[i] * sin(2 * M_PI * frequency * timestamps[i]);
+    }
+    return sum;
+}
+
+float sumCosineMult(const float data[], const float timestamps[], int size, float frequency) {
+    float sum = 0;
+    for (int i = 0; i < size; i++) {
+        sum += data[i] * cos(2 * M_PI * frequency * timestamps[i]);;
     }
     return sum;
 }
@@ -40,16 +72,21 @@ double avg2(const double arr1[], const double arr2[], int size) {
 
 void SINE_least_squares_regression(const float data[], const float timestamps[], int n_samples, float frequency, float* bestAmplitude, float* bestPhase, float* bestOffset) {
     
-    float basisT[2][n_samples]; // Transposed basis matrix. Transposed because it makes the functions more readable
-    for(int i = 0; i < n_samples; i++) {
+    // Invalid operations; I cannnot spare more memory. Use as little as possible.
 
-        basisT[0][i] = sin(2 * M_PI * frequency * timestamps[i]);
-        basisT[1][i] = cos(2 * M_PI * frequency * timestamps[i]);
+    // float basisT[2][n_samples]; // Transposed basis matrix. Transposed because it makes the functions more readable
+    // for(int i = 0; i < n_samples; i++) {
 
-    }
+    //     basisT[0][i] = sin(2 * M_PI * frequency * timestamps[i]);
+    //     basisT[1][i] = cos(2 * M_PI * frequency * timestamps[i]);
+
+    // }
     
-    float result[2] = { sumMult(basisT[0], data, n_samples) / sumSquared(basisT[0], n_samples) , 
-                         sumMult(basisT[1], data, n_samples) / sumSquared(basisT[1], n_samples) };
+    // float result[2] = { sumMult(basisT[0], data, n_samples) / sumSquared(basisT[0], n_samples) , 
+    //                      sumMult(basisT[1], data, n_samples) / sumSquared(basisT[1], n_samples) };
+
+    float result[2] = { sumSineMult(data, timestamps, n_samples , frequency) / sumSineSquared(timestamps, n_samples , frequency),
+                        sumCosineMult(data, timestamps, n_samples , frequency) / sumCosineSquared(timestamps, n_samples , frequency) };
 
     float A = sqrt(result[0] * result[0] + result[1] * result[1]);
     float P = atan(result[1] / result[0]);
