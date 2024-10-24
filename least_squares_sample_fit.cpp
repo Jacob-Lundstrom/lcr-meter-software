@@ -38,7 +38,7 @@ double avg2(const double arr1[], const double arr2[], int size) {
     return sum / size;
 }
 
-void least_squares_regression(const float data[], const float timestamps[], int n_samples, float frequency, float* bestAmplitude, float* bestPhase, float* bestOffset) {
+void SINE_least_squares_regression(const float data[], const float timestamps[], int n_samples, float frequency, float* bestAmplitude, float* bestPhase, float* bestOffset) {
     
     float basisT[2][n_samples]; // Transposed basis matrix. Transposed because it makes the functions more readable
     for(int i = 0; i < n_samples; i++) {
@@ -64,9 +64,9 @@ int main() {
     
     srand(time(NULL));   // Initialization, should only be called once.
 
-    const int n_samples = 100001;
-    float frequency = 10e3; // Hz
-    double max_sample_deviation = 500e-6;
+    const int n_samples = 1001;
+    float frequency = 10; // Hz
+    double max_sample_deviation = 0.001; // seconds
 
     float data[n_samples];
     float time[n_samples];
@@ -82,7 +82,7 @@ int main() {
     }
 
     float amplitude, phase, offset;
-    least_squares_regression(data, time, n_samples, frequency, &amplitude, &phase, &offset);
+    SINE_least_squares_regression(data, time, n_samples, frequency, &amplitude, &phase, &offset);
 
     std::cout << "Amplitude: " << std::endl;
     std::cout << amplitude << std::endl;
