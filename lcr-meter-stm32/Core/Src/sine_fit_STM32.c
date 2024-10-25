@@ -73,28 +73,21 @@ void fitSineWave(const float data[], const float timestamps[], int dataLength, f
 				float* bestAmplitude, float* bestPhase, float* bestOffset) {
 
     float amplitudeMin = 0.01, amplitudeMax = 1.0, amplitudeStep = 0.01;
-    float phaseMin = - M_PI, phaseMax = M_PI, phaseStep = 0.01;
+    float phaseMin = - M_PI, phaseMax = M_PI, phaseStepLarge = 1;
     float offsetMin = 0.5, offsetMax = 2.0, offsetStep = 0.01;
 
+    int cycleSteps = 3;
     // SImplest (worst) method for sine fitting.
     // Bad guesses for amplitude and offset, then recursively find the phase angle.
     float A = (max(data, dataLength) - min(data, dataLength)) / 2;
 //    float O = (max(data, dataLength) + min(data, dataLength)) / 2;
     float O = find_offset(data, dataLength);
 
-    // Now for the phase, I have to sweep the data and find the zero crossing point.
-    // From this, I can find where
-    // Phase = (tzc / T) * 2 * pi
-//    float tzc = 0.0f;
-//    tzc = find_zero_crossing(data, dataLength, O);
-//    float P = ((tzc) * frequency) * 2 * M_PI;
-
-//	*bestAmplitude = A;
-//	*bestOffset = O;
-//    *bestPhase = P;
 
     float minError = DBL_MAX; // Initialize with the largest possible number
-    for (float phase = phaseMin; phase <= phaseMax; phase += phaseStep) {
+
+    // Start by finding a quick estimate
+    for (float phase = phaseMin; phase <= phaseMax; phase += phaseStepLarge / cycleSteps) {
 		// Calculate the error for the current combination of parameters
 		float error = calculateError(data, timestamps, dataLength, A, phase, O, frequency);
 
@@ -102,10 +95,30 @@ void fitSineWave(const float data[], const float timestamps[], int dataLength, f
 		if (error < minError) {
 			minError = error;
 			*bestPhase = phase;
-		    *bestAmplitude = A;
-		    *bestOffset = O;
+			*bestAmplitude = A;
+			*bestOffset = O;
 		}
 	}
+
+    // from here on out, recursively sweep to find a more and more ideal phase estimation.
+    for(int i = 2; i <= cycleSteps; i++ ) {
+		// At this point it should be an alright value of the phase. Get closer to the real one.
+		for (float phase = *bestPhase - phaseStepLarge / (10 * (i - 1));
+				phase <= *bestPhase + phaseStepLarge / (10 * (i - 1));
+				phase += phaseStepLarge / (10 * i)) {
+			// Calculate the error for the current combination of parameters
+			float error = calculateError(data, timestamps, dataLength, A, phase, O, frequency);
+
+			// If this combination gives a smaller error, update the best parameters
+			if (error < minError) {
+				minError = error;
+				*bestPhase = phase;
+				*bestAmplitude = A;
+				*bestOffset = O;
+			}
+		}
+    }
+
 
 
 //    float minError = DBL_MAX; // Initialize with the largest possible number

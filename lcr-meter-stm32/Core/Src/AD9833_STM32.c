@@ -3,7 +3,7 @@
 #include "AD9833_STM32.h"
 
 #define AD9833_SPI_FREQ 20000000 // Max SPI Frequency for AD9833
-#define MASTER_CLK 1000000       // Relation to the output waveform frequency
+#define MASTER_CLK 25000000       // Relation to the output waveform frequency
 
 // MaKE SURE THIS IS DEFINED IN THE main.c FILE
 extern SPI_HandleTypeDef hspi1; // SPI handle (Assuming SPI1 is used)

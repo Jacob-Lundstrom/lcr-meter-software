@@ -112,8 +112,9 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-  float frequency = 3000;
+  float frequency = 10000;
 
+  AD9833_set_freq(frequency);
   AD9833_set_freq(frequency);
 
   int n_points = 1000;
@@ -163,11 +164,12 @@ int main(void)
   while (1)
   {
 	  float avg = 0;
-	  int cycles = 100;
+
+	  int cycles = 1000;
 	  for (int i = 0; i < cycles; i++) {
 		  int samples = 0;
 		  uint32_t s = Get_Time_us();
-		  while((float)(Get_Time_us() - s) < 1e6 / frequency) {
+		  do { // Ensures that sample time is no longer than one period of a sine wave
 			  //	  HAL_Delay(sample_delay);
 			  ch0_data[samples] = ADC_Channel0();
 			  ch0_time[samples] = ((double)(Get_Time_us() - start_time)) / 1e6;
@@ -176,14 +178,17 @@ int main(void)
 			  ch1_time[samples] = ((double)(Get_Time_us() - start_time)) / 1e6;
 
 			  samples++;
-		  }
+		  } while((float)(Get_Time_us() - s) < 1 * 1e6 / frequency);
 
-		  SINE_least_squares_regression(ch0_data, ch0_time, samples, frequency, &load_amplitude, &load_phase, &load_offset);
-		  SINE_least_squares_regression(ch1_data, ch1_time, samples, frequency, &shunt_amplitude, &shunt_phase, &shunt_offset);
+		  fitSineWave(ch0_data, ch0_time, samples, frequency, &load_amplitude, &load_phase, &load_offset);
+		  fitSineWave(ch1_data, ch1_time, samples, frequency, &shunt_amplitude, &shunt_phase, &shunt_offset);
 
-		  float shunt_resistance = 99.67;
+		  float shunt_resistance = 1000;
 		  float impedance_magnitude = (load_amplitude / (shunt_amplitude / shunt_resistance));
 		  float impedance_angle = (load_phase - shunt_phase);
+		  if (impedance_angle > M_PI) {
+			  impedance_angle -= 2 * M_PI;
+		  }
 		  float resistance = impedance_magnitude * cos(impedance_angle) - shunt_resistance;
 		  float reactance = impedance_magnitude * sin(impedance_angle);
 		  float inductance = reactance / (2 * M_PI * frequency);
@@ -194,7 +199,6 @@ int main(void)
 		  avg += capacitance;
 	  }
 	  avg = avg / cycles;
-	  avg = avg;
 
 
     /* USER CODE END WHILE */
@@ -325,7 +329,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -476,10 +480,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(AD9833_NCS_GPIO_Port, AD9833_NCS_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(MCP3202_NCS_GPIO_Port, MCP3202_NCS_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOD, AD9833_NCS_Pin|MCP3202_NCS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
