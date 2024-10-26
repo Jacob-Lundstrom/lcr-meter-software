@@ -112,10 +112,10 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-  float frequency = 10000;
+  float frequency = 5000;
 
   AD9833_set_freq(frequency);
-  AD9833_set_freq(frequency);
+  AD9833_set_freq(frequency); // This fixes things sometimes?
 
   int n_points = 1000;
   int sample_delay = 1;
@@ -165,7 +165,7 @@ int main(void)
   {
 	  float avg = 0;
 
-	  int cycles = 1000;
+	  int cycles = 100;
 	  for (int i = 0; i < cycles; i++) {
 		  int samples = 0;
 		  uint32_t s = Get_Time_us();
@@ -183,7 +183,7 @@ int main(void)
 		  fitSineWave(ch0_data, ch0_time, samples, frequency, &load_amplitude, &load_phase, &load_offset);
 		  fitSineWave(ch1_data, ch1_time, samples, frequency, &shunt_amplitude, &shunt_phase, &shunt_offset);
 
-		  float shunt_resistance = 1000;
+		  float shunt_resistance = 994.5;
 		  float impedance_magnitude = (load_amplitude / (shunt_amplitude / shunt_resistance));
 		  float impedance_angle = (load_phase - shunt_phase);
 		  if (impedance_angle > M_PI) {
@@ -196,7 +196,7 @@ int main(void)
 		  samples = 0;
 		  __HAL_TIM_SET_COUNTER(&htim2, 0);
 		  start_time = Get_Time_us();
-		  avg += capacitance;
+		  avg += resistance;
 	  }
 	  avg = avg / cycles;
 
@@ -329,7 +329,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;

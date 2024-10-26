@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 // Function to calculate the error between the input data and a sine wave
-float calculateError(float data[], float timestamps[], int dataLength,
+float calculateError(const float data[], const float timestamps[], int dataLength,
                       float amplitude, float phase, float offset, float frequency) {
     double error = 0.0;
     for (int i = 0; i < dataLength; i++) {
@@ -72,22 +72,24 @@ float find_offset(float data[], int dataLength) {
 void fitSineWave(const float data[], const float timestamps[], int dataLength, float frequency,
 				float* bestAmplitude, float* bestPhase, float* bestOffset) {
 
-    float amplitudeMin = 0.01, amplitudeMax = 1.0, amplitudeStep = 0.01;
+    float amplitudeMin = 0.01, amplitudeMax = 1.0, amplitudeStepLarge = 0.01;
     float phaseMin = - M_PI, phaseMax = M_PI, phaseStepLarge = 1;
     float offsetMin = 0.5, offsetMax = 2.0, offsetStep = 0.01;
 
-    int cycleSteps = 3;
+    int cycleSteps = 5;
     // SImplest (worst) method for sine fitting.
     // Bad guesses for amplitude and offset, then recursively find the phase angle.
     float A = (max(data, dataLength) - min(data, dataLength)) / 2;
 //    float O = (max(data, dataLength) + min(data, dataLength)) / 2;
     float O = find_offset(data, dataLength);
+    *bestOffset = O;
 
 
-    float minError = DBL_MAX; // Initialize with the largest possible number
+
+    float minError = FLT_MAX; // Initialize with the largest possible number
 
     // Start by finding a quick estimate
-    for (float phase = phaseMin; phase <= phaseMax; phase += phaseStepLarge / cycleSteps) {
+    for (float phase = phaseMin; phase <= phaseMax; phase += phaseStepLarge) {
 		// Calculate the error for the current combination of parameters
 		float error = calculateError(data, timestamps, dataLength, A, phase, O, frequency);
 
@@ -95,17 +97,15 @@ void fitSineWave(const float data[], const float timestamps[], int dataLength, f
 		if (error < minError) {
 			minError = error;
 			*bestPhase = phase;
-			*bestAmplitude = A;
-			*bestOffset = O;
 		}
 	}
 
     // from here on out, recursively sweep to find a more and more ideal phase estimation.
-    for(int i = 2; i <= cycleSteps; i++ ) {
+    for(int i = 1; i < cycleSteps; i++ ) {
 		// At this point it should be an alright value of the phase. Get closer to the real one.
-		for (float phase = *bestPhase - phaseStepLarge / (10 * (i - 1));
-				phase <= *bestPhase + phaseStepLarge / (10 * (i - 1));
-				phase += phaseStepLarge / (10 * i)) {
+		for (float phase = *bestPhase - phaseStepLarge / pow(10, i-1);
+				phase <= *bestPhase + phaseStepLarge / pow(10, i-1);
+				phase += phaseStepLarge / pow(10, i)) {
 			// Calculate the error for the current combination of parameters
 			float error = calculateError(data, timestamps, dataLength, A, phase, O, frequency);
 
@@ -113,69 +113,36 @@ void fitSineWave(const float data[], const float timestamps[], int dataLength, f
 			if (error < minError) {
 				minError = error;
 				*bestPhase = phase;
-				*bestAmplitude = A;
-				*bestOffset = O;
 			}
 		}
     }
 
+    float ampError = FLT_MAX;
+    for (float amplitude = amplitudeMin; amplitude <= amplitudeMax; amplitude += amplitudeStepLarge) {
+		// Calculate the error for the current combination of parameters
+		float error = calculateError(data, timestamps, dataLength, amplitude, *bestPhase, *bestOffset, frequency);
 
+		// If this combination gives a smaller error, update the best parameters
+		if (error < ampError) {
+			ampError = error;
+			*bestAmplitude = amplitude;
+		}
+	}
 
-//    float minError = DBL_MAX; // Initialize with the largest possible number
-//	for (float phase = phaseMin; phase <= phaseMax; phase += phaseStep) {
-//		// Calculate the error for the current combination of parameters
-//		float error = calculateError(data, timestamps, dataLength, 1, phase, 0, frequency);
-//
-//		// If this combination gives a smaller error, update the best parameters
-//		if (error < minError) {
-//			minError = error;
-//			*bestPhase = phase;
-//		}
-//	}
-//
-//	minError = DBL_MAX;
-//
-//	for (double amplitude = amplitudeMin; amplitude <= amplitudeMax; amplitude += amplitudeStep) {
-//			// Calculate the error for the current combination of parameters
-//		double error = calculateError(data, timestamps, dataLength, amplitude, 0, 0, frequency);
-//
-//		// If this combination gives a smaller error, update the best parameters
-//		if (error < minError) {
-//			minError = error;
-//			*bestAmplitude = amplitude;
-//		}
-//	}
-//
-//	minError = DBL_MAX;
-//
-//    for (float offset = offsetMin; offset <= offsetMax; offset += offsetStep) {
-//		// Calculate the error for the current combination of parameters
-//		float error = calculateError(data, timestamps, dataLength, *bestAmplitude, *bestPhase, offset, frequency);
-//
-//		// If this combination gives a smaller error, update the best parameters
-//		if (error < minError) {
-//			minError = error;
-//			*bestOffset = offset;
-//		}
-//	}
+	// from here on out, recursively sweep to find a more and more ideal phase estimation.
+	for(int i = 1; i < cycleSteps; i++ ) {
+		// At this point it should be an alright value of the phase. Get closer to the real one.
+		for (float amplitude = *bestAmplitude - amplitudeStepLarge / pow(10, i-1);
+				amplitude <= *bestAmplitude + amplitudeStepLarge / pow(10, i-1);
+				amplitude += amplitudeStepLarge / pow(10, i)) {
+			// Calculate the error for the current combination of parameters
+			float error = calculateError(data, timestamps, dataLength, amplitude, *bestPhase, *bestOffset, frequency);
 
-
-//	 Nested loops to sweep amplitude, phase, and offset
-//    float minError = DBL_MAX;
-//	for (double amplitude = amplitudeMin; amplitude <= amplitudeMax; amplitude += amplitudeStep) {
-//		for (double phase = phaseMin; phase <= phaseMax; phase += phaseStep) {
-//			for (float offset = offsetMin; offset <= offsetMax; offset += offsetStep) {
-//					// Calculate the error for the current combination of parameters
-//				float error = calculateError(data, timestamps, dataLength, *bestAmplitude, *bestPhase, offset, frequency);
-//
-//				// If this combination gives a smaller error, update the best parameters
-//				if (error < minError) {
-//					minError = error;
-//					*bestAmplitude = amplitude;
-//					*bestPhase = phase;
-//					*bestOffset = offset;
-//				}
-//			}
-//		}
-//    }
+			// If this combination gives a smaller error, update the best parameters
+			if (error < ampError) {
+				ampError = error;
+				*bestAmplitude = amplitude;
+			}
+		}
+	}
 }

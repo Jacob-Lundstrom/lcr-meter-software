@@ -1,6 +1,6 @@
 
 
-float calculateError(float data[], float timestamps[], int dataLength,
+float calculateError(const float data[], const float timestamps[], int dataLength,
                       float amplitude, float phase, float offset, float frequency);
 
 
