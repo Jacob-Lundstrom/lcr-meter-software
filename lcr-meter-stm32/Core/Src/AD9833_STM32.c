@@ -1,6 +1,7 @@
 // Converted from the original Python file
 
 #include "AD9833_STM32.h"
+#include "main.h"
 
 #define AD9833_SPI_FREQ 10000000 // Max SPI Frequency for AD9833 is 40 MHz
 #define MASTER_CLK 25000000       // Relation to the output waveform frequency
@@ -52,6 +53,7 @@ void AD9833_set_freq(float f) {
     AD9833_write4(Lhb, Llb, Hhb, Hlb);
 
     AD9833_write(0b00100000, 0b00000000); // Control reg, finish reset and configure IC
+    HAL_Delay(1);
 }
 
 void AD9833_Init() {

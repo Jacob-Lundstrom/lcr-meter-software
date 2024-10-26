@@ -1,4 +1,5 @@
-Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
+Core/Src/ILI9341_STM32_Driver.o: ../Core/Src/ILI9341_STM32_Driver.c \
+ ../Core/Src/ILI9341_STM32_Driver.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -33,12 +34,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h \
- ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h \
- ../Core/Inc/AD9833_STM32.h ../Core/Inc/main.h \
- ../Core/Inc/MCP3202_STM32.h ../Core/Inc/sine_fit_STM32.h \
- ../Core/Inc/sine_linear_regression_STM32.h \
- ../Core/Src/ILI9341_STM32_Driver.h ../Core/Src/ILI9341_GFX.h
-../Core/Inc/main.h:
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h
+../Core/Src/ILI9341_STM32_Driver.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:
@@ -74,10 +71,3 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h:
-../Core/Inc/AD9833_STM32.h:
-../Core/Inc/main.h:
-../Core/Inc/MCP3202_STM32.h:
-../Core/Inc/sine_fit_STM32.h:
-../Core/Inc/sine_linear_regression_STM32.h:
-../Core/Src/ILI9341_STM32_Driver.h:
-../Core/Src/ILI9341_GFX.h:

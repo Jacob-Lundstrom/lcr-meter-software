@@ -21,10 +21,18 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "string.h"
 #include "AD9833_STM32.h"
 #include "MCP3202_STM32.h"
 #include "sine_fit_STM32.h"
 #include "sine_linear_regression_STM32.h"
+
+
+// LCD screen
+
+#include "ILI9341_STM32_Driver.h"
+#include "ILI9341_GFX.h"
+
 
 #include <math.h>
 /* USER CODE END Includes */
@@ -48,6 +56,7 @@
 ADC_HandleTypeDef hadc1;
 
 SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi3;
 
 TIM_HandleTypeDef htim2;
 
@@ -56,6 +65,8 @@ UART_HandleTypeDef huart3;
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
+
+
 
 /* USER CODE END PV */
 
@@ -67,12 +78,53 @@ static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_SPI3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+uint32_t frequency = 1000;
+int FREQ_UPDATE_NEEDED = 1; // Flag to tell the system that it needs to update the test frequency.
+
+void Show_Stats(float reactance, float resistance, float frequency){
+	ILI9341_Fill_Screen(WHITE);
+	ILI9341_Set_Rotation(SCREEN_HORIZONTAL_2);
+
+	double X = (double) reactance;
+	double R = (double) resistance;
+
+	// Make sure in project properties to add the linker flag -u _printf_float
+
+    char buffer[50]; // Buffer to hold the formatted string
+	if (X < 0){
+		float capacitance = -1e9 / (2 * M_PI * frequency * X);
+		snprintf(buffer, sizeof(buffer), "Cs: %.2f nF", capacitance);
+		ILI9341_Draw_Text(buffer, 10, 60, BLACK, 2, WHITE);
+	} else {
+        float inductance = X * 1e6 / (2 * M_PI * frequency);
+        snprintf(buffer, sizeof(buffer), "Ls: %.2f uH", inductance);
+        ILI9341_Draw_Text(buffer, 10, 60, BLACK, 2, WHITE);
+	}
+
+	snprintf(buffer, sizeof(buffer), "ESR: %.2f Ohms", R);
+	ILI9341_Draw_Text(buffer, 10, 120, BLACK, 2, WHITE);
+
+
+	snprintf(buffer, sizeof(buffer), "Freq: %.2f kHz", frequency / 1000);
+	ILI9341_Draw_Text(buffer, 10, 180, BLACK, 2, WHITE);
+}
+
+uint32_t Get_Time_us(void) {
+	return __HAL_TIM_GET_COUNTER(&htim2); // Read timer
+}
+
+void wait_us(uint32_t w) {
+  uint32_t s = Get_Time_us();
+  while(Get_Time_us() - s < w);
+}
 
 /* USER CODE END 0 */
 
@@ -110,12 +162,9 @@ int main(void)
   MX_ADC1_Init();
   MX_SPI1_Init();
   MX_TIM2_Init();
+  MX_SPI3_Init();
   /* USER CODE BEGIN 2 */
 
-  float frequency = 5000;
-
-  AD9833_set_freq(frequency);
-  AD9833_set_freq(frequency); // This fixes things sometimes?
 
   int n_points = 1000;
   int sample_delay = 1;
@@ -139,15 +188,8 @@ int main(void)
   __HAL_TIM_SET_COUNTER(&htim2, 0);
   HAL_TIM_Base_Start(&htim2);
 
-  uint32_t Get_Time_us(void) {
-	    return __HAL_TIM_GET_COUNTER(&htim2); // Read timer
-  }
 
   start_time = Get_Time_us();
-
-  void wait_us(uint32_t w) {
-	  uint32_t s = Get_Time_us();
-  }
 
   float load_amplitude = 0;
   float load_phase = 0;
@@ -157,20 +199,41 @@ int main(void)
   float shunt_phase = 0;
   float shunt_offset = 0;
 
+
+  ILI9341_Init(); // This messses with somthing, which causxes the signal generation to be incorrect
+  // Not sure what happens.
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  float avg = 0;
 
-	  int cycles = 100;
+
+	  if (FREQ_UPDATE_NEEDED > 0) {
+		  AD9833_set_freq(frequency);
+		  AD9833_set_freq(frequency);
+		  // I have to do this twice because I'm using two SPI devices on this bus which
+		  // use different modes. After an ADC reading, the clock idles low. This
+		  // for some reason can't be changed by just reconfiguring the SPI bus (as I am doing in the
+		  // AD9833 driver) but rather actually requires an spi transfer to initiate the correct
+		  // Polarity clock for the start of the next transfer. This is required because the AD9833
+		  // Requires the clock to idle HIGH before the CS/FSYNC pin goes low. I'm too lazy to figure
+		  // out how to fix this easily. This works, so I'm keeping it.
+		  FREQ_UPDATE_NEEDED = 0; // clear flag
+	  }
+
+	  float sampleF = frequency; // samples and hold the frequency to ensure it won't change while in the middle of gathering smaples
+	  float avgX = 0;
+	  float avgR = 0;
+	  int cycles = 10;
 	  for (int i = 0; i < cycles; i++) {
 		  int samples = 0;
 		  uint32_t s = Get_Time_us();
 		  do { // Ensures that sample time is no longer than one period of a sine wave
 			  //	  HAL_Delay(sample_delay);
+
 			  ch0_data[samples] = ADC_Channel0();
 			  ch0_time[samples] = ((double)(Get_Time_us() - start_time)) / 1e6;
 		//	  HAL_Delay(sample_delay);
@@ -180,8 +243,8 @@ int main(void)
 			  samples++;
 		  } while((float)(Get_Time_us() - s) < 1 * 1e6 / frequency);
 
-		  fitSineWave(ch0_data, ch0_time, samples, frequency, &load_amplitude, &load_phase, &load_offset);
-		  fitSineWave(ch1_data, ch1_time, samples, frequency, &shunt_amplitude, &shunt_phase, &shunt_offset);
+		  fitSineWave(ch0_data, ch0_time, samples, sampleF, &load_amplitude, &load_phase, &load_offset);
+		  fitSineWave(ch1_data, ch1_time, samples, sampleF, &shunt_amplitude, &shunt_phase, &shunt_offset);
 
 		  float shunt_resistance = 994.5;
 		  float impedance_magnitude = (load_amplitude / (shunt_amplitude / shunt_resistance));
@@ -191,14 +254,17 @@ int main(void)
 		  }
 		  float resistance = impedance_magnitude * cos(impedance_angle) - shunt_resistance;
 		  float reactance = impedance_magnitude * sin(impedance_angle);
-		  float inductance = reactance / (2 * M_PI * frequency);
-		  float capacitance = - 1 / (2 * M_PI * frequency * reactance);
+
 		  samples = 0;
 		  __HAL_TIM_SET_COUNTER(&htim2, 0);
 		  start_time = Get_Time_us();
-		  avg += resistance;
+		  avgX += reactance;
+		  avgR += resistance;
 	  }
-	  avg = avg / cycles;
+	  avgX = avgX / cycles;
+	  avgR = avgR / cycles;
+
+	  Show_Stats(avgX, avgR, sampleF);
 
 
     /* USER CODE END WHILE */
@@ -345,6 +411,44 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief SPI3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI3_Init(void)
+{
+
+  /* USER CODE BEGIN SPI3_Init 0 */
+
+  /* USER CODE END SPI3_Init 0 */
+
+  /* USER CODE BEGIN SPI3_Init 1 */
+
+  /* USER CODE END SPI3_Init 1 */
+  /* SPI3 parameter configuration*/
+  hspi3.Instance = SPI3;
+  hspi3.Init.Mode = SPI_MODE_MASTER;
+  hspi3.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi3.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi3.Init.NSS = SPI_NSS_SOFT;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi3.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI3_Init 2 */
+
+  /* USER CODE END SPI3_Init 2 */
+
+}
+
+/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
@@ -473,6 +577,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
@@ -480,10 +585,16 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, AD9833_NCS_Pin|MCP3202_NCS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOG, LCD_NCS_Pin|LCD_RST_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : USER_Btn_Pin */
   GPIO_InitStruct.Pin = USER_Btn_Pin;
@@ -497,6 +608,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LCD_DC_Pin */
+  GPIO_InitStruct.Pin = LCD_DC_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(LCD_DC_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : AD9833_NCS_Pin MCP3202_NCS_Pin */
   GPIO_InitStruct.Pin = AD9833_NCS_Pin|MCP3202_NCS_Pin;
@@ -518,6 +636,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : LCD_NCS_Pin LCD_RST_Pin */
+  GPIO_InitStruct.Pin = LCD_NCS_Pin|LCD_RST_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
@@ -528,11 +653,13 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	HAL_GPIO_TogglePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin);
-}
-
-void LCR_Meter_Collect_Sample(void){
-
+//	HAL_GPIO_TogglePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin);
+//	int frequency = 0;
+	frequency = frequency + 1000;
+	if (frequency > 5000) {
+		frequency = 1000;
+	}
+	FREQ_UPDATE_NEEDED = 1;
 }
 /* USER CODE END 4 */
 

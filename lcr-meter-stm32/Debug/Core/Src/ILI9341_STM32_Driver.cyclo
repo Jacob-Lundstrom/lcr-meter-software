@@ -1,0 +1,16 @@
+../Core/Src/ILI9341_STM32_Driver.c:94:6:ILI9341_SPI_Init	1
+../Core/Src/ILI9341_STM32_Driver.c:102:6:ILI9341_SPI_Send	1
+../Core/Src/ILI9341_STM32_Driver.c:108:6:ILI9341_Write_Command	1
+../Core/Src/ILI9341_STM32_Driver.c:117:6:ILI9341_Write_Data	1
+../Core/Src/ILI9341_STM32_Driver.c:126:6:ILI9341_Set_Address	1
+../Core/Src/ILI9341_STM32_Driver.c:144:6:ILI9341_Reset	1
+../Core/Src/ILI9341_STM32_Driver.c:154:6:ILI9341_Set_Rotation	5
+../Core/Src/ILI9341_STM32_Driver.c:191:6:ILI9341_Enable	1
+../Core/Src/ILI9341_STM32_Driver.c:197:6:ILI9341_Init	1
+../Core/Src/ILI9341_STM32_Driver.c:340:6:ILI9341_Draw_Colour	1
+../Core/Src/ILI9341_STM32_Driver.c:352:6:ILI9341_Draw_Colour_Burst	5
+../Core/Src/ILI9341_STM32_Driver.c:396:6:ILI9341_Fill_Screen	1
+../Core/Src/ILI9341_STM32_Driver.c:408:6:ILI9341_Draw_Pixel	3
+../Core/Src/ILI9341_STM32_Driver.c:459:6:ILI9341_Draw_Rectangle	5
+../Core/Src/ILI9341_STM32_Driver.c:475:6:ILI9341_Draw_Horizontal_Line	4
+../Core/Src/ILI9341_STM32_Driver.c:487:6:ILI9341_Draw_Vertical_Line	4

@@ -61,7 +61,7 @@ main-build: lcr-meter-stm32.elf secondary-outputs
 
 # Tool invocations
 lcr-meter-stm32.elf lcr-meter-stm32.map: $(OBJS) $(USER_OBJS) C:\Users\jakel\Documents\GitHub\lcr-meter-software\lcr-meter-stm32\STM32F446ZETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "lcr-meter-stm32.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\jakel\Documents\GitHub\lcr-meter-software\lcr-meter-stm32\STM32F446ZETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="lcr-meter-stm32.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "lcr-meter-stm32.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\jakel\Documents\GitHub\lcr-meter-software\lcr-meter-stm32\STM32F446ZETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="lcr-meter-stm32.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
