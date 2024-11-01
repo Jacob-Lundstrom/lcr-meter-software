@@ -90,7 +90,7 @@ uint32_t frequency = 1000;
 int FREQ_UPDATE_NEEDED = 1; // Flag to tell the system that it needs to update the test frequency.
 
 void Show_Stats(float reactance, float resistance, float frequency){
-	ILI9341_Fill_Screen(WHITE);
+//	ILI9341_Fill_Screen(BLACK);
 	ILI9341_Set_Rotation(SCREEN_HORIZONTAL_2);
 
 	double X = (double) reactance;
@@ -101,20 +101,37 @@ void Show_Stats(float reactance, float resistance, float frequency){
     char buffer[50]; // Buffer to hold the formatted string
 	if (X < 0){
 		float capacitance = -1e9 / (2 * M_PI * frequency * X);
+		ILI9341_Draw_Text("                        ", 10, 48, WHITE, 2, BLACK);
 		snprintf(buffer, sizeof(buffer), "Cs: %.2f nF", capacitance);
-		ILI9341_Draw_Text(buffer, 10, 60, BLACK, 2, WHITE);
+		ILI9341_Draw_Text(buffer, 10, 48, WHITE, 2, BLACK);
+
+
+        char impedance[50];
+        snprintf(impedance, sizeof(impedance), "Z: %.2f - j %.2f", R, -X);
+
+		ILI9341_Draw_Text("                        ", 10, 144, WHITE, 2, BLACK);
+		ILI9341_Draw_Text(impedance, 10, 144, WHITE, 2, BLACK);
+
 	} else {
         float inductance = X * 1e6 / (2 * M_PI * frequency);
+		ILI9341_Draw_Text("                        ", 10, 48, WHITE, 2, BLACK);
         snprintf(buffer, sizeof(buffer), "Ls: %.2f uH", inductance);
-        ILI9341_Draw_Text(buffer, 10, 60, BLACK, 2, WHITE);
+        ILI9341_Draw_Text(buffer, 10, 48, WHITE, 2, BLACK);
+
+        char impedance[50];
+        snprintf(impedance, sizeof(impedance), "Z: %.2f + j %.2f", R, X);
+
+		ILI9341_Draw_Text("                        ", 10, 144, WHITE, 2, BLACK);
+		ILI9341_Draw_Text(impedance, 10, 144, WHITE, 2, BLACK);
 	}
 
+	ILI9341_Draw_Text("                        ", 10, 96, WHITE, 2, BLACK);
 	snprintf(buffer, sizeof(buffer), "ESR: %.2f Ohms", R);
-	ILI9341_Draw_Text(buffer, 10, 120, BLACK, 2, WHITE);
+	ILI9341_Draw_Text(buffer, 10, 96, WHITE, 2, BLACK);
 
-
+	ILI9341_Draw_Text("                        ", 10, 192, WHITE, 2, BLACK);
 	snprintf(buffer, sizeof(buffer), "Freq: %.2f kHz", frequency / 1000);
-	ILI9341_Draw_Text(buffer, 10, 180, BLACK, 2, WHITE);
+	ILI9341_Draw_Text(buffer, 10, 192, WHITE, 2, BLACK);
 }
 
 uint32_t Get_Time_us(void) {
@@ -594,6 +611,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, LCD_NCS_Pin|LCD_RST_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : USER_Btn_Pin */
@@ -635,6 +655,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PC9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LCD_NCS_Pin LCD_RST_Pin */
   GPIO_InitStruct.Pin = LCD_NCS_Pin|LCD_RST_Pin;
