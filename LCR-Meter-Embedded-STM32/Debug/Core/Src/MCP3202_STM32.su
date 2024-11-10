@@ -1,0 +1,2 @@
+../Core/Src/MCP3202_STM32.c:8:7:ADC_Channel0	32	static
+../Core/Src/MCP3202_STM32.c:32:7:ADC_Channel1	32	static

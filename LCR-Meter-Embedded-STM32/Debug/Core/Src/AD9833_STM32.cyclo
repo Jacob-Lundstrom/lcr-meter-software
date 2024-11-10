@@ -1,0 +1,4 @@
+../Core/Src/AD9833_STM32.c:13:6:AD9833_write	1
+../Core/Src/AD9833_STM32.c:26:6:AD9833_write4	1
+../Core/Src/AD9833_STM32.c:38:6:AD9833_set_freq	1
+../Core/Src/AD9833_STM32.c:59:6:AD9833_Init	1

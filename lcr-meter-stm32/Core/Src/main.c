@@ -27,9 +27,6 @@
 #include "sine_fit_STM32.h"
 #include "sine_linear_regression_STM32.h"
 
-
-// LCD screen
-
 #include "ILI9341_STM32_Driver.h"
 #include "ILI9341_GFX.h"
 
@@ -263,7 +260,7 @@ int main(void)
 		  fitSineWave(ch0_data, ch0_time, samples, sampleF, &load_amplitude, &load_phase, &load_offset);
 		  fitSineWave(ch1_data, ch1_time, samples, sampleF, &shunt_amplitude, &shunt_phase, &shunt_offset);
 
-		  float shunt_resistance = 994.5;
+		  float shunt_resistance = 993.6;
 		  float impedance_magnitude = (load_amplitude / (shunt_amplitude / shunt_resistance));
 		  float impedance_angle = (load_phase - shunt_phase);
 		  if (impedance_angle > M_PI) {

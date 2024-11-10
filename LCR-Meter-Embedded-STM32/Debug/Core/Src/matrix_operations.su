@@ -1,0 +1,7 @@
+../Core/Src/matrix_operations.c:5:7:__row_col_mult_sum_1__	48	static
+../Core/Src/matrix_operations.c:14:7:__row_col_mult_sum_2__	48	static
+../Core/Src/matrix_operations.c:29:6:ATA_Nx3	112	dynamic
+../Core/Src/matrix_operations.c:47:6:ATB_Nx3_Nx1	112	dynamic
+../Core/Src/matrix_operations.c:65:6:invert_3x3	80	static
+../Core/Src/matrix_operations.c:116:6:Matrix_Multiply_3x3_3x1	32	static
+../Core/Src/matrix_operations.c:125:6:least_squares_sine	208	dynamic

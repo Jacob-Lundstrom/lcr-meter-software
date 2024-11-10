@@ -1,0 +1,6 @@
+../Core/Src/sine_fit_STM32.c:6:7:calculateError	72	static
+../Core/Src/sine_fit_STM32.c:18:7:max	24	static
+../Core/Src/sine_fit_STM32.c:29:7:min	24	static
+../Core/Src/sine_fit_STM32.c:39:7:find_zero_crossing	40	static
+../Core/Src/sine_fit_STM32.c:62:7:find_offset	24	static
+../Core/Src/sine_fit_STM32.c:72:6:fitSineWave	160	static
