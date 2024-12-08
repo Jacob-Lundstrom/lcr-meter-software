@@ -181,11 +181,9 @@ int main(void)
 
 
   int n_points = 1000;
-  int sample_delay = 1;
 
   uint32_t start_time;
 
-  int i = 0; // Array index counter
 
   // All the data must be floating point, as the nucleo board I'm using doesn't have enough memory for double.
   float ch0_data[n_points];

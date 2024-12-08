@@ -25,8 +25,7 @@
 #include <stdbool.h>
 #include "AD9833_STM32.h"
 #include "MCP3202_STM32.h"
-#include "sine_fit_STM32.h"
-#include "sine_linear_regression_STM32.h"
+
 #include "matrix_operations.h"
 
 #include "ILI9341_STM32_Driver.h"
@@ -61,6 +60,7 @@ SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi3;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 /* USER CODE BEGIN PV */
 
@@ -75,6 +75,7 @@ static void MX_SPI3_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_ADC2_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -82,7 +83,7 @@ static void MX_TIM2_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-uint32_t frequency = 100000;
+uint32_t frequency = 1000;
 int FREQ_UPDATE_NEEDED = 1; // Flag to tell the system that it needs to update the test frequency.
 // All the data must be floating point, as the nucleo board I'm using doesn't have enough memory for double.
 
@@ -104,92 +105,249 @@ void wait_us(uint32_t w) {
   while(Get_Time_us() - s < w);
 }
 
-float ADC_START() {
-	float t1 = Get_Time_us();
-	float t2 = Get_Time_us();
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)ch1_data, MAX_POINTS);
+void ADC_START() {
+	HAL_TIM_Base_Stop(&htim3);// Make sure that the timer is stopped, so we don't start ADC conversions in the middle of processing
+
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)ch1_data, MAX_POINTS); // This is required for all ADC conversion types
 	HAL_ADC_Start_DMA(&hadc2, (uint32_t*)ch0_data, MAX_POINTS);
-	float t3 = Get_Time_us();
+
+	HAL_Delay(10); // Should be enough time for calibration?
+
+	__HAL_TIM_SET_COUNTER(&htim2, 0);
+	HAL_TIM_Base_Start(&htim3);
 
 	CH0_DONE_SAMPLING = false;
 	CH1_DONE_SAMPLING = false;
-
-	return (float)(t3 - t1 - (t2 - t1)) / 2;
 }
 
-void convert_to_float(const uint16_t *input_array, float *output_array, size_t length) {
-    const float scale_factor = 3.3f / 4095.0f;
-    for (size_t i = 0; i < length; i++) {
-    	if (i == 133) {
-    		i = i + 1;
-    		i = i - 1;
-    	}
-    	float o = input_array[i] * scale_factor;
+void convert_to_double(const uint16_t *input_array, double *output_array, size_t length) {
+    const double scale_factor = 3.3 / 4095.0;
+    for (int i = 0; i < length; i++) {
+    	double o = input_array[i] * scale_factor;
         output_array[i] = o;
     }
 }
 
-float CH0_STM() {
+int get_range() {
+	// This function figures out what range is currently being used.
+	// Returns the number corresponding to the range.
+	// If there is a problem, it will return -1.
+	int r0 = HAL_GPIO_ReadPin(GPIOC, RANGE_0_Pin); // 100 Ohms
+	int r1 = HAL_GPIO_ReadPin(GPIOC, RANGE_1_Pin); // 1000 Ohms
+	int r2 = HAL_GPIO_ReadPin(GPIOC, RANGE_2_Pin); // 10000 Ohms
+	int r3 = HAL_GPIO_ReadPin(GPIOC, RANGE_3_Pin); // 100000 Ohms
 
-	HAL_ADC_PollForConversion(&hadc1, 10); // poll for conversion
-
-	int adc_val = HAL_ADC_GetValue(&hadc1); // get the adc value
-
-	return 3.3f * ((float) adc_val) / pow(2, 12);
+	int n = (r0*1) + (r1*10) + (r2*100) + (r3*1000);
+	if (n == 0) {
+		return -1;
+	}
+	if (n == 1) {
+		return 0;
+	}
+	if (n == 10) {
+		return 1;
+	}
+	if (n == 100) {
+		return 2;
+	}
+	if (n == 1000){
+		return 3;
+	}
+	return -1;
 }
 
-float CH1_STM() {
+int set_range(int range) {
+	if (range < 0) {
+		HAL_GPIO_WritePin(GPIOC, RANGE_0_Pin, 0); // 100 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_1_Pin, 0); // 1000 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_2_Pin, 0); // 10000 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_3_Pin, 0); // 100000 Ohms
 
-	HAL_ADC_PollForConversion(&hadc2, 10); // poll for conversion
+		return -1;
+	}
+	if (range > 3) {
+		HAL_GPIO_WritePin(GPIOC, RANGE_0_Pin, 0); // 100 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_1_Pin, 0); // 1000 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_2_Pin, 0); // 10000 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_3_Pin, 0); // 100000 Ohms
 
-	int adc_val = HAL_ADC_GetValue(&hadc2); // get the adc value
+		return -1;
+	}
 
-	return 3.3f * ((float) adc_val) / pow(2, 12);
+	if (range == 0) {
+		HAL_GPIO_WritePin(GPIOC, RANGE_1_Pin, 0); // 1000 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_2_Pin, 0); // 10000 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_3_Pin, 0); // 100000 Ohms
+
+		HAL_GPIO_WritePin(GPIOC, RANGE_0_Pin, 1); // 100 Ohms
+		HAL_Delay(100);
+		return 1;
+	} else if(range == 1) {
+		HAL_GPIO_WritePin(GPIOC, RANGE_0_Pin, 0); // 100 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_2_Pin, 0); // 10000 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_3_Pin, 0); // 100000 Ohms
+
+		HAL_GPIO_WritePin(GPIOC, RANGE_1_Pin, 1); // 1000 Ohms
+		HAL_Delay(100);
+		return 1;
+	} else if (range == 2) {
+		HAL_GPIO_WritePin(GPIOC, RANGE_0_Pin, 0); // 100 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_1_Pin, 0); // 1000 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_3_Pin, 0); // 100000 Ohms
+
+		HAL_GPIO_WritePin(GPIOC, RANGE_2_Pin, 1); // 10000 Ohms
+		HAL_Delay(100);
+		return 1;
+	} else {
+		HAL_GPIO_WritePin(GPIOC, RANGE_0_Pin, 0); // 100 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_1_Pin, 0); // 1000 Ohms
+		HAL_GPIO_WritePin(GPIOC, RANGE_2_Pin, 0); // 10000 Ohms
+
+		HAL_GPIO_WritePin(GPIOC, RANGE_3_Pin, 1); // 100000 Ohms
+		HAL_Delay(100);
+		return 1;
+	}
+
 }
 
-void Show_Stats(float reactance, float resistance, float frequency){
+double get_shunt_resistance() {
+
+	int range = get_range();
+
+	double shunt_resistance;
+	if (range == 0) {
+		shunt_resistance = 102.10;
+	} else if (range == 1){
+		shunt_resistance = 1002.8;
+	} else if (range == 2){
+		shunt_resistance = 10012;
+	} else { // No fault handling for now. Should never be a fault :)
+		shunt_resistance = 107250;
+	}
+	return shunt_resistance;
+}
+
+double get_amp_calibration() {
+	// This needs to be done for each meter/setup
+	double ACF0 = 19.959 / 20;
+	double ACF1 = 19.887 / 20;
+	double ACF2 = 19.826 / 20;
+	double ACF3 = 15.856 / 20;
+
+	int range = get_range();
+
+	if (frequency == 1000) {
+		if (range == 0) {
+			return ACF0;
+		} else if (range == 1) {
+			return ACF1;
+		} else if (range == 2) {
+			return ACF2;
+		} else if (range == 3) {
+			return ACF3;
+		} else {
+			return 1;
+		}
+	} else {
+		return 1;
+	}
+}
+
+double get_phase_calibration() {
+	// This needs to be done for each meter/setup
+	double PCF0 = -0.0014542840503944804;
+	double PCF1 = -0.003935525496759973;
+	double PCF2 = -0.030454848010975977;
+	double PCF3 = -0.034066954299771218;
+
+	int range = get_range();
+	if (frequency == 1000) {
+		if (range == 0) {
+			return PCF0;
+		} else if (range == 1) {
+			return PCF1;
+		} else if (range == 2) {
+			return PCF2;
+		} else if (range == 3) {
+			return PCF3;
+		} else {
+			return 0;
+		}
+	} else {
+		return 0;
+	}
+}
+
+int auto_range(float magnitude) {
+	// This function changes the current range resistor.
+	// The return value is 0 if the range is unchanged, or 1 if the range has successfully changed.
+	int current_range = get_range();
+
+	if (magnitude > 5.5 * (100 * pow(10,current_range))){
+		if (current_range != 2) {
+			set_range(current_range + 1);
+			return 1;
+		}
+		return 0;
+	}
+	if (magnitude < 5.5 * (100 * pow(10,current_range - 1))) {
+		if (current_range != 0) {
+			set_range(current_range - 1);
+			return 1;
+		}
+		return 0;
+	}
+	return 0;
+}
+
+void Show_Stats(double reactance, double resistance, double frequency){
 //	ILI9341_Fill_Screen(BLACK);
 	ILI9341_Set_Rotation(SCREEN_HORIZONTAL_2);
 
-	double X = (double) reactance;
-	double R = (double) resistance;
+	double X = reactance;
+	double R = resistance;
 
 	// Make sure in project properties to add the linker flag -u _printf_float
 
     char buffer[50]; // Buffer to hold the formatted string
 	if (X < 0){
 		float capacitance = -1e9 / (2 * M_PI * frequency * X);
-		ILI9341_Draw_Text("                        ", 10, 48, WHITE, 2, BLACK);
-		snprintf(buffer, sizeof(buffer), "Cs: %.2f nF", capacitance);
-		ILI9341_Draw_Text(buffer, 10, 48, WHITE, 2, BLACK);
+		ILI9341_Draw_Text("                        ", 10, 40, WHITE, 2, BLACK);
+		snprintf(buffer, sizeof(buffer), "Cs: %.3f nF", capacitance);
+		ILI9341_Draw_Text(buffer, 10, 40, WHITE, 2, BLACK);
 
 
         char impedance[50];
         snprintf(impedance, sizeof(impedance), "Z: %.2f - j %.2f", R, -X);
 
-		ILI9341_Draw_Text("                        ", 10, 144, WHITE, 2, BLACK);
-		ILI9341_Draw_Text(impedance, 10, 144, WHITE, 2, BLACK);
+		ILI9341_Draw_Text("                        ", 10, 120, WHITE, 2, BLACK);
+		ILI9341_Draw_Text(impedance, 10, 120, WHITE, 2, BLACK);
 
 	} else {
         float inductance = X * 1e6 / (2 * M_PI * frequency);
-		ILI9341_Draw_Text("                        ", 10, 48, WHITE, 2, BLACK);
-        snprintf(buffer, sizeof(buffer), "Ls: %.2f uH", inductance);
-        ILI9341_Draw_Text(buffer, 10, 48, WHITE, 2, BLACK);
+		ILI9341_Draw_Text("                        ", 10, 40, WHITE, 2, BLACK);
+        snprintf(buffer, sizeof(buffer), "Ls: %.3f uH", inductance);
+        ILI9341_Draw_Text(buffer, 10, 40, WHITE, 2, BLACK);
 
         char impedance[50];
-        snprintf(impedance, sizeof(impedance), "Z: %.2f + j %.2f", R, X);
+        snprintf(impedance, sizeof(impedance), "Z: %.3f + j %.3f", R, X);
 
-		ILI9341_Draw_Text("                        ", 10, 144, WHITE, 2, BLACK);
-		ILI9341_Draw_Text(impedance, 10, 144, WHITE, 2, BLACK);
+		ILI9341_Draw_Text("                        ", 10, 120, WHITE, 2, BLACK);
+		ILI9341_Draw_Text(impedance, 10, 120, WHITE, 2, BLACK);
 	}
 
-	ILI9341_Draw_Text("                        ", 10, 96, WHITE, 2, BLACK);
+	ILI9341_Draw_Text("                        ", 10, 80, WHITE, 2, BLACK);
 	snprintf(buffer, sizeof(buffer), "ESR: %.2f Ohms", R);
-	ILI9341_Draw_Text(buffer, 10, 96, WHITE, 2, BLACK);
+	ILI9341_Draw_Text(buffer, 10, 80, WHITE, 2, BLACK);
 
-	ILI9341_Draw_Text("                        ", 10, 192, WHITE, 2, BLACK);
+	ILI9341_Draw_Text("                        ", 10, 160, WHITE, 2, BLACK);
 	snprintf(buffer, sizeof(buffer), "Freq: %.2f kHz", frequency / 1000);
-	ILI9341_Draw_Text(buffer, 10, 192, WHITE, 2, BLACK);
+	ILI9341_Draw_Text(buffer, 10, 160, WHITE, 2, BLACK);
+
+
+	ILI9341_Draw_Text("                        ", 10, 200, WHITE, 2, BLACK);
+	snprintf(buffer, sizeof(buffer), "Range: %i", get_range());
+	ILI9341_Draw_Text(buffer, 10, 200, WHITE, 2, BLACK);
 }
 
 /* USER CODE END 0 */
@@ -229,30 +387,24 @@ int main(void)
   MX_ADC1_Init();
   MX_ADC2_Init();
   MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+
 
 
   memset(ch0_data, 0, MAX_POINTS);  // Set all bytes in the array to 0
   memset(ch1_data, 0, MAX_POINTS);  // Set all bytes in the array to 0
 
-	uint32_t start_time;
-
-	int i = 0; // Array index counter
-
-
 	__HAL_TIM_SET_COUNTER(&htim2, 0);
 	HAL_TIM_Base_Start(&htim2);
 
+	double load_amplitude = 0;
+	double load_phase = 0;
+	double load_offset = 0;
 
-	start_time = Get_Time_us();
-
-	float load_amplitude = 0;
-	float load_phase = 0;
-	float load_offset = 0;
-
-	float shunt_amplitude = 0;
-	float shunt_phase = 0;
-	float shunt_offset = 0;
+	double shunt_amplitude = 0;
+	double shunt_phase = 0;
+	double shunt_offset = 0;
 
 
 	ILI9341_Init();
@@ -280,63 +432,58 @@ int main(void)
 	  }
 
 
-	  float sampleF = frequency; // samples and hold the frequency to ensure it won't change while in the middle of gathering smaples
-	  float avgX = 0;
-	  float avgR = 0;
-	  int cycles = 10;
+	  double sampleF = frequency; // samples and hold the frequency to ensure it won't change while in the middle of gathering smaples
+	  double sampleRate = 1.4e6;
+	  double avgMag = 0;
+	  double avgPhase = 0;
+	  double avgR = 0;
+	  double avgX = 0;
+	  int cycles = 5;
 
 	  for (int i = 0; i < cycles; i++) {
 
-		  float delay = ADC_START();
-		  while(!CH0_DONE_SAMPLING || !CH1_DONE_SAMPLING); // Wait	 for samples to be  collected
+		  ADC_START();
+		  while(!CH0_DONE_SAMPLING || !CH1_DONE_SAMPLING); // Wait for samples to be  collected
 
-//	  		  uint32_t collected_points = 1400000 / sampleF; // 1 full period of samples
 		  uint32_t collected_points = MAX_POINTS; // Testing new method with all the available points
 
-//		  float load_data[collected_points];
-//		  float shunt_data[collected_points];
+		  double DBL_BUF[collected_points];
 
-		  // The order of these conversions matters?????????
-		  // The second one that gets processed is corrupted somehow
-//		  convert_to_float(ch1_data, shunt_data, collected_points);
-//		  convert_to_float(ch0_data, load_data, collected_points);
+		  convert_to_double(ch1_data, DBL_BUF, collected_points);
+		  least_squares_sine(collected_points, sampleF, sampleRate, 0, DBL_BUF, &shunt_amplitude, &shunt_phase, &shunt_offset);
 
-//		  least_squares_sine(collected_points, sampleF, 1.4e6, load_data, &load_amplitude, &load_phase, &load_offset);
-//		  least_squares_sine(collected_points, sampleF, 1.4e6, shunt_data, &shunt_amplitude, &shunt_phase, &shunt_offset);
+		  convert_to_double(ch0_data, DBL_BUF, collected_points);
+		  least_squares_sine(collected_points, sampleF, sampleRate, 0, DBL_BUF, &load_amplitude, &load_phase, &load_offset);
 
-		  // See what happens when I use one buffer for both
-		  // START TEST
-		  float FLT_BUF[collected_points];
+		  double shunt_resistance = get_shunt_resistance();
 
-		  convert_to_float(ch1_data, FLT_BUF, collected_points);
-		  least_squares_sine(collected_points, sampleF, 1.4e6, 0, FLT_BUF, &shunt_amplitude, &shunt_phase, &shunt_offset);
-
-		  convert_to_float(ch0_data, FLT_BUF, collected_points);
-		  least_squares_sine(collected_points, sampleF, 1.4e6, delay, FLT_BUF, &load_amplitude, &load_phase, &load_offset);
-
-
-		  memset(ch0_data, 0, MAX_POINTS);  // Set all bytes in the array to 0
-		  memset(ch1_data, 0, MAX_POINTS);  // Set all bytes in the array to 0
-		  // END TEST
-
-
-//		  float shunt_resistance = 102.24;
-		  float shunt_resistance = 1003.8;
-
-		  float impedance_magnitude = (load_amplitude / (shunt_amplitude / shunt_resistance));
-		  float impedance_angle = (load_phase - shunt_phase);
-		  float resistance = impedance_magnitude * cos(impedance_angle);
-		  float reactance = impedance_magnitude * sin(impedance_angle);
-
+		  double impedance_magnitude = (load_amplitude / (shunt_amplitude / shunt_resistance));
+		  double impedance_angle = (load_phase - shunt_phase);
+		  if (impedance_angle > M_PI) {
+			  impedance_angle -= 2 * M_PI;
+		  }
+		  avgMag += impedance_magnitude;
+		  avgPhase += impedance_angle;
 
 		  __HAL_TIM_SET_COUNTER(&htim2, 0);
-		  avgX += reactance;
-		  avgR += resistance;
+
 	  }
-	  avgX = avgX / cycles;
-	  avgR = avgR / cycles;
+	  double ACF = get_amp_calibration(); // Calibration factor, range 2
+	  double PCF = get_phase_calibration();
+	  avgMag = (avgMag / cycles) * ACF;
+
+	  // Frequency 1000
+	  avgPhase = (avgPhase / cycles) + PCF; // Range 3
+
+	  avgX = avgMag * sin(avgPhase);
+	  avgR = avgMag * cos(avgPhase);
 
 	  Show_Stats(avgX, avgR, sampleF);
+
+
+	  auto_range(sqrt(avgX * avgX + avgR * avgR));
+
+//	  set_range(3);
 
     /* USER CODE END WHILE */
 
@@ -417,8 +564,8 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = DISABLE;
   hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
+  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T3_TRGO;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
   hadc1.Init.DMAContinuousRequests = DISABLE;
@@ -469,8 +616,8 @@ static void MX_ADC2_Init(void)
   hadc2.Init.ScanConvMode = DISABLE;
   hadc2.Init.ContinuousConvMode = ENABLE;
   hadc2.Init.DiscontinuousConvMode = DISABLE;
-  hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
+  hadc2.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T3_TRGO;
   hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc2.Init.NbrOfConversion = 1;
   hadc2.Init.DMAContinuousRequests = DISABLE;
@@ -617,6 +764,51 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 999;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -654,10 +846,10 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, LCD_NCS_Pin|LCD_RST_Pin|LCD_DC_Pin|LCD_LED_Pin
-                          |RANGE_1_Pin, GPIO_PIN_SET);
+                          |RANGE_2_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, RANGE_3_Pin|RANGE_2_Pin|RANGE_0_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, RANGE_3_Pin|RANGE_1_Pin|RANGE_0_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, AD9833_NCS_Pin|MCP3202_NCS_Pin, GPIO_PIN_SET);
@@ -678,9 +870,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB14 PB15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_14|GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pins : Button_0_Pin Button_1_Pin */
+  GPIO_InitStruct.Pin = Button_0_Pin|Button_1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
@@ -691,15 +883,20 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-	frequency = frequency + 1000;
-	if (frequency > 5000) {
-		frequency = 1000;
+//	frequency = frequency + 1000;
+	frequency = frequency * 10;
+	if (frequency > 100000) {
+		frequency = 100;
 	}
 	FREQ_UPDATE_NEEDED = 1;
 }
@@ -711,6 +908,15 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 	}
 	else if (hadc == &hadc2) {
 		CH0_DONE_SAMPLING = true;
+	}
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	// Check which version of the timer triggered this callback and toggle LED
+	if (htim == &htim3 )
+	{
+		HAL_TIM_Base_Stop(&htim3);// Make sure that the timer is stopped, so we don't start ADC conversions in the middle of processing
 	}
 }
 
