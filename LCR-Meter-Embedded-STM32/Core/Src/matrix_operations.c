@@ -2,18 +2,18 @@
 #include <math.h>
 #include <main.h>
 
-float __row_col_mult_sum_1__(int N, float A1[3][N], int row1, float A2[N][3], int col2){
+double __row_col_mult_sum_1__(int N, double A1[3][N], int row1, double A2[N][3], int col2){
 	// Sums the multiple of row row1 in A1 with the corresponding values in column col2 of A2
-	float sum = 0;
+	double sum = 0;
 	for (int i = 0; i < N; i++) {
 	    sum += A1[row1][i] * A2[i][col2];
 	}
 	return sum;
 }
 
-float __row_col_mult_sum_2__(int N, float A[3][N], int row1, float B[]) {
+double __row_col_mult_sum_2__(int N, double A[3][N], int row1, double B[]) {
 
-    float sum = 0;
+    double sum = 0;
     for (int i = 0; i < N; i++) {
         sum += A[row1][i] * B[i];
     }
@@ -26,9 +26,9 @@ float __row_col_mult_sum_2__(int N, float A[3][N], int row1, float B[]) {
 * The result of this will be a 3x3 matrix. The data will be stored in a two-dimensional
 * array that is passed to the function.
 */
-void ATA_Nx3(const int N, float A[N][3], float O[3][3]) {
+void ATA_Nx3(const int N, double A[N][3], double O[3][3]) {
     // I'm not using input validation. Make sure that the input is correct.
-    float AT[3][N];
+    double AT[3][N];
     // correct i think
     for (int i = 0; i < N; i++) {
         AT[0][i] = A[i][0];
@@ -44,11 +44,11 @@ void ATA_Nx3(const int N, float A[N][3], float O[3][3]) {
     return;
 }
 
-void ATB_Nx3_Nx1(int N, float A[N][3], float B[], float O[3][1]) {
+void ATB_Nx3_Nx1(int N, double A[N][3], double B[], double O[3][1]) {
     // Here, B is treated as a column vecter, though the input should be in row vector form.
 
     // I'm not using input validation. Make sure that the input is correct.
-    float AT[3][N];
+    double AT[3][N];
     for (int i = 0; i < N; i++) {
         AT[0][i] = A[i][0];
         AT[1][i] = A[i][1];
@@ -62,7 +62,7 @@ void ATB_Nx3_Nx1(int N, float A[N][3], float B[], float O[3][1]) {
 }
 
 // Function is verified to work
-void invert_3x3(float A[3][3], float O[3][3]) {
+void invert_3x3(double A[3][3], double O[3][3]) {
     // Will take the contents of matrix A and place the matrix inverse in O.
 
     // Find the cofactor matrix of A, place contents in O
@@ -79,7 +79,7 @@ void invert_3x3(float A[3][3], float O[3][3]) {
     O[2][2] = A[0][0] * A[1][1] - A[0][1] * A[1][0]; // X
 
     // Find the Adjoint matrix ( Transpose the cofactor matrix )
-    float OT[3][3];
+    double OT[3][3];
     for (int i = 0; i < 3; i++) {
         OT[0][i] = O[i][0];
         OT[1][i] = O[i][1];
@@ -94,10 +94,10 @@ void invert_3x3(float A[3][3], float O[3][3]) {
     }
 
     // Find determinant of A, divide contents of O and replace
-    float d1 = A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]);
-    float d2 = -A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]);
-    float d3 = A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
-    float determinant = d1 + d2 + d3;
+    double d1 = A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]);
+    double d2 = -A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]);
+    double d3 = A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
+    double determinant = d1 + d2 + d3;
     // Technically I don't have to do the additional calculations of
     // the cofactors but I'm leaving it for clarity
 
@@ -113,7 +113,7 @@ void invert_3x3(float A[3][3], float O[3][3]) {
 }
 
 
-void Matrix_Multiply_3x3_3x1(float A[3][3], float B[3][1], float O[3][1]) {
+void Matrix_Multiply_3x3_3x1(double A[3][3], double B[3][1], double O[3][1]) {
     for (int i = 0; i < 3; i++) {
         O[i][0] = 0; // Initialize the output element to zero
         for (int j = 0; j < 3; j++) {
@@ -122,25 +122,26 @@ void Matrix_Multiply_3x3_3x1(float A[3][3], float B[3][1], float O[3][1]) {
     }
 }
 
-void least_squares_sine(int N, float frequency, float sampleRate, float offset_us, float data[],
-    float* bestAmplitude, float* bestPhase, float* bestOffset) {
-    float basis[N][3];
+void least_squares_sine(int N, double injection_frequency, double sampling_rate, double offset_us, double data[], double* bestAmplitude, double* bestPhase, double* bestOffset) {
+
+    double basis[N][3];
     for (int i = 0; i < N; i++) {
-        basis[i][0] = sin(2 * M_PI * frequency * (((float)i / sampleRate)+ offset_us / 1e6));
-        basis[i][1] = cos(2 * M_PI * frequency * (((float)i / sampleRate)+ offset_us / 1e6));
+    	double t = (((double)i / sampling_rate)+ offset_us / 1e6);
+        basis[i][0] = sin(2 * M_PI * injection_frequency * t);
+        basis[i][1] = cos(2 * M_PI * injection_frequency * t);
         basis[i][2] = 1;
     }
 
-    float ATA[3][3];
+    double ATA[3][3];
     ATA_Nx3(N, basis, ATA); // Same
 
-    float ATAI[3][3];
+    double ATAI[3][3];
     invert_3x3(ATA, ATAI); // Same
 
-    float ATB[3][1];
+    double ATB[3][1];
     ATB_Nx3_Nx1(N, basis, data, ATB); // same
 
-    float X[3][1];
+    double X[3][1];
     Matrix_Multiply_3x3_3x1(ATAI, ATB, X); // Different
 
     *bestAmplitude = sqrt(X[0][0] * X[0][0] + X[1][0] * X[1][0]);

@@ -69,6 +69,12 @@ void Error_Handler(void);
 #define ADC_CH0_GPIO_Port GPIOA
 #define ADC_CH1_Pin GPIO_PIN_1
 #define ADC_CH1_GPIO_Port GPIOA
+#define Button_0_Pin GPIO_PIN_14
+#define Button_0_GPIO_Port GPIOB
+#define Button_0_EXTI_IRQn EXTI15_10_IRQn
+#define Button_1_Pin GPIO_PIN_15
+#define Button_1_GPIO_Port GPIOB
+#define Button_1_EXTI_IRQn EXTI15_10_IRQn
 #define RANGE_3_Pin GPIO_PIN_6
 #define RANGE_3_GPIO_Port GPIOC
 #define RANGE_2_Pin GPIO_PIN_7
